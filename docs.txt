@@ -1,0 +1,63 @@
+DOKUMENTASI KASFLOW API - UPDATE FITUR NOTIFIKASI & OCR
+
+=========================================================
+FITUR PENGUMUMAN GLOBAL (NOTIFIKASI)
+Fitur ini digunakan untuk mengambil daftar pengumuman dari Admin agar dapat ditampilkan di Frontend (misalnya berupa popup, banner, atau riwayat lonceng aplikasi yang sama untuk semua orang).
+Karena notifikasi sekarang bersifat global, tidak ada konsep "sudah dibaca per user" di database. Hal tersebut dapat dihandle dari local storage / cookies aplikasi Frontend.
+
+1. GET ALL GLOBAL NOTIFICATIONS
+   URL: GET /api/v1/notifications
+   Query Params (Opsional):
+     - page: nomor halaman (default: 1)
+     - limit: jumlah data per halaman (default: 20)
+   Headers: Authorization: Bearer <token>
+   
+   Response Success (200 OK):
+   {
+     "data": [
+       {
+         "id": "uuid-notif",
+         "title": "Maintenance Server",
+         "message": "Akan ada perbaikan rutin pada jam 2 malam.",
+         "type": "warning", // "info", "warning", "success", "error"
+         "created_at": "2023-10-12T..."
+       }
+     ],
+     "pagination": { "page": 1, "limit": 20, "total": 1, "totalPages": 1 }
+   }
+
+=========================================================
+PENGELOLAAN PENGUMUMAN VIA ADMIN PANEL
+Admin sekarang dapat melihat, membuat, mengedit, dan menghapus pengumuman secara langsung di Dashboard Admin Panel /admin-panel. Fitur ini terletak pada Tab "Pengumuman Global".
+
+=========================================================
+CRON JOBS (OTOMATISASI SERVER)
+- "Daily Reminder Email" yang tadinya berjalan otomatis setiap jam 08:00 WIB, kini telah diubah ke jadwal jam 10:00 WIB (Sesuai konfigurasi Vercel Crons `0 3 * * *`).
+
+=========================================================
+FITUR OCR & STRUK
+
+1. Endpoint Baru: Scan Struk (OCR)
+   URL: POST /api/v1/transactions/ocr
+   Headers: 
+     - Authorization: Bearer <token>
+     - Content-Type: multipart/form-data
+   Body:
+     - receipt (File Gambar): Foto dari struk yang akan discan.
+   
+   Response:
+   Mengembalikan url gambar (dari catbox.moe) dan "suggested_total" serta "suggested_date".
+
+2. Update Endpoint: Create & Update Transaction
+   URL: POST /api/v1/transactions   (dan PUT)
+   Sekarang menerima parameter opsional baru yaitu `receipt_url`.
+   
+   Body (JSON):
+   {
+     "type": "expense",
+     "amount": 50000,
+     "description": "Beli Bahan Baku",
+     "category_id": "uuid-kategori",
+     "date": "2023-10-12",
+     "receipt_url": "https://files.catbox.moe/xxxxx.jpg"  // <---- Parameter Baru (Menerima string kosong url "")
+   }

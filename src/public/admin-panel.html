@@ -1,0 +1,621 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>KasFlow Admin Panel</title>
+<style>
+:root {
+--purple: #818cf8;
+--purple-dark: #6366f1;
+--purple-light: #3730a3;
+--green: #34d399;
+--red: #f87171;
+--gray: #9ca3af;
+--border: #374151;
+--bg: #111827;
+--card-bg: #1f2937;
+--text: #f9fafb;
+--text-muted: #9ca3af;
+--toast-bg: #374151;
+}
+[data-theme="light"] {
+--purple: #6366f1;
+--purple-dark: #4f46e5;
+--purple-light: #eef2ff;
+--green: #10b981;
+--red: #ef4444;
+--gray: #6b7280;
+--border: #e5e7eb;
+--bg: #f9fafb;
+--card-bg: #ffffff;
+--text: #111827;
+--text-muted: #6b7280;
+--toast-bg: #ffffff;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+background: var(--bg);
+min-height: 100vh;
+color: var(--text);
+transition: background 0.3s, color 0.3s;
+}
+header {
+background: linear-gradient(135deg, #6366f1, #8b5cf6);
+padding: 18px 32px;
+display: flex; align-items: center; gap: 12px;
+box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+}
+header h1 { color: #fff; font-size: 22px; }
+header span { color: rgba(255, 255, 255, 0.7); font-size: 13px; }
+.header-right { margin-left: auto; display: flex; align-items: center; gap: 12px; }
+.badge {
+background: rgba(255, 255, 255, 0.2); color: #fff;
+font-size: 12px; font-weight: 500; padding: 6px 14px; border-radius: 999px;
+}
+.btn-header {
+background: rgba(255, 255, 255, 0.15); color: #fff;
+border: 1px solid rgba(255,255,255,0.3); padding: 5px 12px;
+border-radius: 6px; font-size: 12px; cursor: pointer; transition: 0.2s;
+}
+.btn-header:hover { background: rgba(255,255,255,0.25); }
+.btn-logout:hover { background: rgba(239, 68, 68, 0.8); border-color: transparent; }
+#auth-gate {
+display: flex; align-items: center; justify-content: center;
+min-height: calc(100vh - 60px);
+}
+.auth-card {
+background: var(--card-bg); border-radius: 16px; padding: 40px 36px;
+box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+width: 100%; max-width: 380px; text-align: center;
+border: 1px solid var(--border);
+transition: background 0.3s, border 0.3s;
+}
+.lock-icon { font-size: 48px; margin-bottom: 16px; }
+.auth-card h2 { font-size: 20px; margin-bottom: 8px; }
+.auth-card p { color: var(--text-muted); font-size: 14px; margin-bottom: 24px; }
+#app { display: none; max-width: 860px; margin: 32px auto; padding: 0 20px 60px; }
+.card {
+background: var(--card-bg); border-radius: 14px; padding: 28px;
+box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+border: 1px solid var(--border); margin-bottom: 24px;
+transition: background 0.3s, border 0.3s;
+}
+.card h2 {
+font-size: 16px; font-weight: 700; margin-bottom: 20px;
+display: flex; align-items: center; gap: 8px;
+}
+.card h2 .icon { font-size: 20px; }
+.form-group { margin-bottom: 16px; text-align: left; }
+label { display: block; font-size: 13px; font-weight: 600; color: var(--text); margin-bottom: 6px; }
+input[type="text"], input[type="password"], input[type="email"], textarea {
+width: 100%; padding: 10px 14px; border: 1px solid var(--border);
+border-radius: 8px; font-size: 14px; outline: none; font-family: inherit;
+background: var(--bg); color: var(--text);
+transition: border 0.2s, background 0.3s, color 0.3s;
+}
+input:focus, textarea:focus { border-color: var(--purple); }
+textarea { height: 110px; resize: vertical; }
+.btn {
+padding: 10px 22px; border: none; border-radius: 8px; cursor: pointer;
+font-size: 14px; font-weight: 600; transition: opacity 0.2s, transform 0.1s, background 0.3s;
+}
+.btn:active { transform: scale(0.97); }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-primary { background: var(--purple); color: #fff; }
+.btn-primary:hover:not(:disabled) { background: var(--purple-dark); }
+.btn-green { background: var(--green); color: #fff; }
+.btn-green:hover:not(:disabled) { opacity: 0.85; }
+.btn-ghost { background: var(--purple-light); color: var(--purple); }
+.btn-ghost:hover { background: var(--border); }
+.users-toolbar { display: flex; gap: 10px; align-items: center; margin-bottom: 14px; flex-wrap: wrap; justify-content: space-between; }
+.users-toolbar input { max-width: 240px; }
+.table-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th { background: var(--purple-light); color: var(--purple); padding: 10px 14px; text-align: left; transition: background 0.3s; }
+td { padding: 10px 14px; border-bottom: 1px solid var(--border); transition: border 0.3s; }
+tr:last-child td { border-bottom: none; }
+tr:hover td { background: var(--border); }
+.use-btn {
+padding: 4px 12px; font-size: 12px; border-radius: 6px;
+background: var(--purple-light); color: var(--text); border: none;
+cursor: pointer; font-weight: 600; transition: 0.2s;
+}
+.use-btn:hover { filter: brightness(1.2); }
+.pagination { display: flex; gap: 6px; align-items: center; justify-content: flex-end; margin-top: 14px; }
+.page-btn {
+padding: 6px 12px; border: 1px solid var(--border); background: var(--card-bg);
+color: var(--text); border-radius: 6px; cursor: pointer; font-size: 12px; transition: 0.2s;
+}
+.page-btn:hover:not(:disabled) { border-color: var(--purple); color: var(--purple); }
+.page-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.page-info { font-size: 12px; color: var(--text-muted); }
+.tab-row { display: flex; gap: 4px; margin-bottom: 20px; }
+.tab {
+padding: 8px 18px; border-radius: 8px; border: none; cursor: pointer;
+font-size: 13px; font-weight: 600; background: var(--bg);
+color: var(--text-muted); transition: 0.15s;
+}
+.tab.active { background: var(--purple); color: #fff; }
+.spinner {
+display: inline-block; width: 16px; height: 16px;
+border: 2px solid rgba(255, 255, 255, 0.4); border-top-color: #fff;
+border-radius: 50%; animation: spin 0.6s linear infinite; vertical-align: middle;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+#toast-container {
+position: fixed; bottom: 24px; right: 24px; display: flex; flex-direction: column; gap: 10px; z-index: 9999;
+}
+.toast {
+background: var(--toast-bg); color: var(--text); padding: 14px 20px;
+border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+border-left: 4px solid var(--gray);
+font-size: 14px; display: flex; align-items: center; gap: 10px;
+animation: slideIn 0.3s forwards;
+border: 1px solid var(--border);
+}
+.toast.ok { border-left-color: var(--green); }
+.toast.err { border-left-color: var(--red); }
+@keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+@keyframes fadeOut { to { opacity: 0; } }
+</style>
+</head>
+<body>
+<header>
+<span style="font-size: 26px">💰</span>
+<h1>KasFlow</h1>
+<span>Admin Panel</span>
+<div class="header-right" id="header-right" style="display: none">
+<button class="btn-header" onclick="toggleTheme()" id="theme-btn">☀️ Light</button>
+<span class="badge" id="admin-badge">Sesi: --:--</span>
+<button class="btn-header btn-logout" onclick="logout()">Keluar</button>
+</div>
+</header>
+<div id="auth-gate">
+<div class="auth-card">
+<div class="lock-icon">🔐</div>
+<h2>Admin Login</h2>
+<p>Silakan masuk menggunakan akun Root Admin</p>
+<div class="form-group">
+<label>Username</label>
+<input type="text" id="username-input" placeholder="Username" autocomplete="off" />
+</div>
+<div class="form-group">
+<label>Password</label>
+<input type="password" id="password-input" placeholder="Password" autocomplete="off" />
+</div>
+<button class="btn btn-primary" id="btn-login" style="width: 100%; margin-top: 8px;" onclick="authenticate()">Masuk</button>
+</div>
+</div>
+<div id="app">
+<div class="card">
+<h2><span class="icon">👥</span> Daftar Pengguna</h2>
+<div class="users-toolbar">
+<input type="text" id="search-input" placeholder="Cari nama / email…" oninput="filterUsers()" />
+<div>
+<button class="btn btn-ghost" onclick="loadUsers()">🔄 Refresh</button>
+</div>
+</div>
+<div class="table-wrap">
+<table id="users-table">
+<thead>
+<tr>
+<th>#</th><th>Nama</th><th>Email</th><th>Bergabung</th><th>Aksi</th>
+</tr>
+</thead>
+<tbody id="users-body">
+<tr>
+<td colspan="5" style="text-align: center; color: var(--gray)">Loading…</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="pagination">
+<button class="page-btn" id="btn-prev" onclick="changePage(-1)">Prev</button>
+<span class="page-info" id="page-info">Hal 1 dari 1</span>
+<button class="page-btn" id="btn-next" onclick="changePage(1)">Next</button>
+</div>
+</div>
+<div class="card">
+<h2><span class="icon">📧</span> Kirim Email</h2>
+<div class="tab-row">
+<button class="tab active" onclick="switchTab('single', this)">Ke 1 Pengguna</button>
+<button class="tab" onclick="switchTab('broadcast', this)">Broadcast Semua</button>
+</div>
+<div id="tab-single">
+<div class="form-group">
+<label>Email Tujuan</label>
+<input type="email" id="s-email" placeholder="user@example.com" />
+</div>
+<div class="form-group">
+<label>Subjek / Judul</label>
+<input type="text" id="s-subject" placeholder="Judul..." />
+</div>
+<div class="form-group">
+<label>Pesan</label>
+<textarea id="s-message" placeholder="Isi pesan"></textarea>
+</div>
+<button class="btn btn-primary" id="btn-single-email" onclick="sendSingle()">📤 Kirim Email</button>
+</div>
+<div id="tab-broadcast" style="display: none">
+<div style="background: rgba(245, 158, 11, 0.1); border: 1px solid #fbbf24; border-radius: 8px; padding: 14px; margin-bottom: 18px; font-size: 13px; color: #fbbf24;">
+⚠️ Broadcast akan mengirim email ke <strong>semua pengguna</strong>.
+</div>
+<div class="form-group">
+<label>Subjek</label>
+<input type="text" id="b-subject" placeholder="Judul email…" />
+</div>
+<div class="form-group">
+<label>Pesan</label>
+<textarea id="b-message" placeholder="Isi pesan broadcast…"></textarea>
+</div>
+<button class="btn btn-primary" id="btn-broadcast" onclick="sendBroadcast()" style="width: 100%;">📡 Broadcast Email ke Semua</button>
+</div>
+</div>
+
+<div class="card">
+<h2><span class="icon">🔔</span> Pengumuman Global</h2>
+<div class="table-wrap">
+<table id="notifs-table">
+<thead>
+<tr>
+<th>Tipe</th><th>Judul</th><th>Pesan</th><th>Dibuat</th><th>Aksi</th>
+</tr>
+</thead>
+<tbody id="notifs-body">
+<tr>
+<td colspan="5" style="text-align: center; color: var(--gray)">Loading…</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div style="margin-top: 20px; border-top: 1px solid var(--border); padding-top: 20px;">
+<h3 style="font-size: 14px; margin-bottom: 12px;" id="notif-form-title">Buat Pengumuman Baru</h3>
+<input type="hidden" id="n-id" value="" />
+<div class="form-group">
+<label>Judul</label>
+<input type="text" id="n-title" placeholder="Judul Pengumuman..." />
+</div>
+<div class="form-group">
+<label>Pesan</label>
+<textarea id="n-message" placeholder="Isi pesan..."></textarea>
+</div>
+<div class="form-group">
+<label>Tipe</label>
+<select id="n-type" style="width: 100%; padding: 10px 14px; border: 1px solid var(--border); border-radius: 8px; font-size: 14px; background: var(--bg); color: var(--text);">
+  <option value="info">Info</option>
+  <option value="warning">Warning</option>
+  <option value="success">Success</option>
+</select>
+</div>
+<div style="display: flex; gap: 10px;">
+<button class="btn btn-green" id="btn-save-notif" onclick="saveNotification()">Simpan Pengumuman</button>
+<button class="btn btn-ghost" id="btn-cancel-notif" onclick="resetNotifForm()" style="display:none;">Batal</button>
+</div>
+</div>
+</div>
+</div>
+<div id="toast-container"></div>
+<script>
+const BASE = "/api/v1/admin";
+let JWT_TOKEN = localStorage.getItem('kf_admin_token') || "";
+let EXPIRES_AT = Number(localStorage.getItem('kf_admin_expires')) || 0;
+let allUsers = [];
+let filteredUsers = [];
+let allNotifs = [];
+let currentPage = 1;
+const itemsPerPage = 5;
+let timerInterval = null;
+let isLightMode = localStorage.getItem('kf_theme') === 'light';
+function applyTheme() {
+if (isLightMode) {
+document.documentElement.setAttribute('data-theme', 'light');
+if(document.getElementById('theme-btn')) document.getElementById('theme-btn').textContent = '🌙 Dark';
+} else {
+document.documentElement.removeAttribute('data-theme');
+if(document.getElementById('theme-btn')) document.getElementById('theme-btn').textContent = '☀️ Light';
+}
+}
+function toggleTheme() {
+isLightMode = !isLightMode;
+localStorage.setItem('kf_theme', isLightMode ? 'light' : 'dark');
+applyTheme();
+}
+applyTheme();
+if (JWT_TOKEN && EXPIRES_AT > Date.now()) showApp();
+async function authenticate() {
+const username = document.getElementById("username-input").value.trim();
+const password = document.getElementById("password-input").value.trim();
+if (!username || !password) return showToast("Username & Password wajib diisi.", "err");
+const btn = document.getElementById("btn-login");
+setLoading(btn, true);
+try {
+const res = await fetch(BASE + "/login", {
+method: "POST",
+headers: { "Content-Type": "application/json" },
+body: JSON.stringify({ username, password })
+});
+const json = await res.json().catch(() => ({}));
+if (!res.ok) throw new Error(json.message || json.error || `HTTP ${res.status}`);
+JWT_TOKEN = json.token;
+EXPIRES_AT = json.expiresAt;
+localStorage.setItem('kf_admin_token', JWT_TOKEN);
+localStorage.setItem('kf_admin_expires', EXPIRES_AT.toString());
+showApp();
+showToast("Login berhasil", "ok");
+} catch (err) {
+showToast("❌ " + err.message, "err");
+} finally {
+setLoading(btn, false, "Masuk");
+}
+}
+document.getElementById("password-input").addEventListener("keydown", (e) => {
+if (e.key === "Enter") authenticate();
+});
+function logout() {
+JWT_TOKEN = "";
+EXPIRES_AT = 0;
+localStorage.removeItem('kf_admin_token');
+localStorage.removeItem('kf_admin_expires');
+clearInterval(timerInterval);
+document.getElementById("auth-gate").style.display = "flex";
+document.getElementById("app").style.display = "none";
+document.getElementById("header-right").style.display = "none";
+document.getElementById("username-input").value = "";
+document.getElementById("password-input").value = "";
+}
+function updateTimer() {
+const now = Date.now();
+if (now >= EXPIRES_AT) {
+alert("Sesi admin Anda telah habis. Silakan login kembali.");
+return logout();
+}
+const diff = Math.floor((EXPIRES_AT - now) / 1000);
+const m = String(Math.floor(diff / 60)).padStart(2, '0');
+const s = String(diff % 60).padStart(2, '0');
+document.getElementById("admin-badge").textContent = `Sesi: ${m}:${s}`;
+}
+function showApp() {
+document.getElementById("auth-gate").style.display = "none";
+document.getElementById("app").style.display = "block";
+document.getElementById("header-right").style.display = "flex";
+if(!document.getElementById('theme-btn')) {
+const btn = document.createElement('button');
+btn.className = 'btn-header';
+btn.id = 'theme-btn';
+btn.onclick = toggleTheme;
+document.getElementById("header-right").prepend(btn);
+applyTheme();
+}
+updateTimer();
+clearInterval(timerInterval);
+timerInterval = setInterval(updateTimer, 1000);
+loadUsers();
+loadNotifications();
+}
+async function apiFetch(path, opts = {}) {
+opts.headers = {
+...(opts.headers || {}),
+"Content-Type": "application/json",
+"Authorization": `Bearer ${JWT_TOKEN}`
+};
+const res = await fetch(BASE + path, opts);
+const json = await res.json().catch(() => ({}));
+if (res.status === 401) {
+logout();
+throw new Error("Sesi tidak valid atau telah habis.");
+}
+if (!res.ok) throw new Error(json.message || json.error || `HTTP ${res.status}`);
+return json;
+}
+async function loadUsers() {
+try {
+const data = await apiFetch("/users");
+allUsers = data.users || [];
+filteredUsers = [...allUsers];
+currentPage = 1;
+renderUsers();
+} catch (err) {
+if (JWT_TOKEN) showToast(err.message, "err");
+}
+}
+function renderUsers() {
+const tbody = document.getElementById("users-body");
+if (!filteredUsers.length) {
+tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--text-muted);">Tidak ada pengguna.</td></tr>';
+document.getElementById("page-info").textContent = "Hal 0 dari 0";
+document.getElementById("btn-prev").disabled = true;
+document.getElementById("btn-next").disabled = true;
+return;
+}
+const totalPages = Math.ceil(filteredUsers.length / itemsPerPage);
+if (currentPage > totalPages) currentPage = totalPages;
+const startIdx = (currentPage - 1) * itemsPerPage;
+const pageData = filteredUsers.slice(startIdx, startIdx + itemsPerPage);
+tbody.innerHTML = pageData.map((u, i) => `
+<tr>
+<td>${startIdx + i + 1}</td>
+<td>${esc(u.full_name || "—")}</td>
+<td>${esc(u.email)}</td>
+<td>${new Date(u.created_at).toLocaleDateString("id-ID")}</td>
+<td><button class="use-btn" onclick="prefillUser('${esc(u.email)}')">Pilih</button></td>
+</tr>
+`).join("");
+document.getElementById("page-info").textContent = `Hal ${currentPage} dari ${totalPages} (${filteredUsers.length} total)`;
+document.getElementById("btn-prev").disabled = currentPage === 1;
+document.getElementById("btn-next").disabled = currentPage === totalPages;
+}
+function changePage(delta) {
+currentPage += delta;
+renderUsers();
+}
+function filterUsers() {
+const q = document.getElementById("search-input").value.toLowerCase();
+filteredUsers = allUsers.filter((u) => (u.email + (u.full_name || "")).toLowerCase().includes(q));
+currentPage = 1;
+renderUsers();
+}
+function prefillUser(email) {
+document.getElementById("s-email").value = email;
+switchTab("single", document.querySelector(".tab"));
+document.getElementById("tab-single").scrollIntoView({ behavior: "smooth" });
+}
+function switchTab(tab, el) {
+document.getElementById("tab-single").style.display = tab === "single" ? "" : "none";
+document.getElementById("tab-broadcast").style.display = tab === "broadcast" ? "" : "none";
+document.querySelectorAll(".tab").forEach((t) => t.classList.remove("active"));
+el.classList.add("active");
+}
+async function sendSingle() {
+const email = document.getElementById("s-email").value.trim();
+const subject = document.getElementById("s-subject").value.trim();
+const message = document.getElementById("s-message").value.trim();
+if (!email) return showToast("Email tujuan wajib diisi.", "err");
+const btn = document.getElementById("btn-single-email");
+setLoading(btn, true);
+try {
+const res = await apiFetch("/send-email", {
+method: "POST",
+body: JSON.stringify({ email, subject, message }),
+});
+showToast("✅ " + res.message, "ok");
+document.getElementById("s-subject").value = "";
+document.getElementById("s-message").value = "";
+} catch (err) {
+if(JWT_TOKEN) showToast("❌ " + err.message, "err");
+} finally {
+setLoading(btn, false, "📤 Kirim Email");
+}
+}
+async function loadNotifications() {
+try {
+const data = await apiFetch("/notifications");
+allNotifs = data.notifications || [];
+renderNotifications();
+} catch (err) {
+if (JWT_TOKEN) showToast("Gagal memuat pengumuman: " + err.message, "err");
+}
+}
+function renderNotifications() {
+const tbody = document.getElementById("notifs-body");
+if (!allNotifs.length) {
+tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--text-muted);">Tidak ada pengumuman global.</td></tr>';
+return;
+}
+tbody.innerHTML = allNotifs.map((n) => `
+<tr>
+<td><span class="badge" style="background:var(--purple);color:#fff;">${esc(n.type)}</span></td>
+<td><strong>${esc(n.title)}</strong></td>
+<td>${esc(n.message).substring(0, 50)}${n.message.length > 50 ? '...' : ''}</td>
+<td>${new Date(n.created_at).toLocaleDateString("id-ID")}</td>
+<td>
+  <button class="use-btn" onclick="editNotification('${n.id}')">Edit</button>
+  <button class="use-btn" style="background:rgba(239,68,68,0.2);color:var(--red);margin-left:4px;" onclick="deleteNotification('${n.id}')">Hapus</button>
+</td>
+</tr>
+`).join("");
+}
+async function saveNotification() {
+const id = document.getElementById("n-id").value;
+const title = document.getElementById("n-title").value.trim();
+const message = document.getElementById("n-message").value.trim();
+const type = document.getElementById("n-type").value;
+if (!title || !message) return showToast("Judul dan pesan wajib diisi", "err");
+const btn = document.getElementById("btn-save-notif");
+setLoading(btn, true);
+try {
+const path = id ? "/notifications/" + id : "/notifications";
+const method = id ? "PUT" : "POST";
+const res = await apiFetch(path, {
+  method,
+  body: JSON.stringify({ title, message, type })
+});
+showToast("✅ " + res.message, "ok");
+resetNotifForm();
+loadNotifications();
+} catch (err) {
+if (JWT_TOKEN) showToast("❌ " + err.message, "err");
+} finally {
+setLoading(btn, false, "Simpan Pengumuman");
+}
+}
+function editNotification(id) {
+const n = allNotifs.find(x => x.id === id);
+if (!n) return;
+document.getElementById("notif-form-title").textContent = "Edit Pengumuman";
+document.getElementById("n-id").value = id;
+document.getElementById("n-title").value = n.title;
+document.getElementById("n-message").value = n.message;
+document.getElementById("n-type").value = n.type || "info";
+document.getElementById("btn-cancel-notif").style.display = "inline-block";
+document.getElementById("n-title").focus();
+}
+function resetNotifForm() {
+document.getElementById("notif-form-title").textContent = "Buat Pengumuman Baru";
+document.getElementById("n-id").value = "";
+document.getElementById("n-title").value = "";
+document.getElementById("n-message").value = "";
+document.getElementById("n-type").value = "info";
+document.getElementById("btn-cancel-notif").style.display = "none";
+}
+async function deleteNotification(id) {
+if (!confirm("Yakin ingin menghapus pengumuman ini?")) return;
+try {
+const res = await apiFetch("/notifications/" + id, { method: "DELETE" });
+showToast("✅ " + res.message, "ok");
+loadNotifications();
+if (document.getElementById("n-id").value === id) resetNotifForm();
+} catch (err) {
+if (JWT_TOKEN) showToast("❌ " + err.message, "err");
+}
+}
+async function sendBroadcast() {
+const subject = document.getElementById("b-subject").value.trim();
+const message = document.getElementById("b-message").value.trim();
+if (!subject || !message) return showToast("Subjek dan pesan wajib diisi.", "err");
+if (!confirm(`Yakin ingin broadcast ke ${allUsers.length} pengguna?`)) return;
+const btn = document.getElementById("btn-broadcast");
+setLoading(btn, true);
+try {
+const res = await apiFetch("/broadcast", {
+method: "POST",
+body: JSON.stringify({ subject, message }),
+});
+const failInfo = res.failures?.length ? ` (${res.failures.length} gagal)` : "";
+showToast(`✅ Terkirim ${res.sent}/${res.total}${failInfo}`, "ok");
+document.getElementById("b-subject").value = "";
+document.getElementById("b-message").value = "";
+} catch (err) {
+if(JWT_TOKEN) showToast("❌ " + err.message, "err");
+} finally {
+setLoading(btn, false, "📡 Broadcast ke Semua");
+}
+}
+function showToast(msg, type) {
+const container = document.getElementById("toast-container");
+const toast = document.createElement("div");
+toast.className = `toast ${type}`;
+toast.innerHTML = `<span>${esc(msg)}</span>`;
+container.appendChild(toast);
+setTimeout(() => {
+toast.style.animation = "fadeOut 0.3s forwards";
+setTimeout(() => toast.remove(), 300);
+}, 3000);
+}
+function setLoading(btn, on, label) {
+if (on) {
+btn._origText = btn.textContent;
+btn.disabled = true;
+btn.innerHTML = '<span class="spinner"></span> Mengirim…';
+} else {
+btn.disabled = false;
+btn.textContent = label || btn._origText;
+}
+}
+function esc(s) {
+return String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+</script>
+</body>
+</html>
