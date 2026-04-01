@@ -394,3 +394,17 @@ CREATE INDEX IF NOT EXISTS idx_pos_orders_profile_id  ON pos_orders(profile_id);
 CREATE INDEX IF NOT EXISTS idx_pos_items_order_id     ON pos_order_items(order_id);
 CREATE INDEX IF NOT EXISTS idx_payment_methods_profile ON payment_methods(profile_id);
 
+-- ============================================================
+-- Tabel notifications (global, tidak terikat user tertentu)
+-- "Sudah dibaca / belum" di-handle via localStorage di frontend
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS notifications (
+  id         UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  title      TEXT        NOT NULL,
+  message    TEXT        NOT NULL,
+  type       TEXT        NOT NULL CHECK (type IN ('info', 'warning', 'success', 'error')) DEFAULT 'info',
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_notifications_created_at ON notifications(created_at DESC);
