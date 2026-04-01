@@ -111,9 +111,6 @@ CREATE TABLE IF NOT EXISTS recurring_transactions (
   updated_at   TIMESTAMPTZ   DEFAULT NOW()
 );
 
-ALTER TABLE categories   ADD COLUMN IF NOT EXISTS profile_id UUID REFERENCES financial_profiles(id) ON DELETE CASCADE;
-ALTER TABLE transactions ADD COLUMN IF NOT EXISTS profile_id UUID REFERENCES financial_profiles(id) ON DELETE CASCADE;
-
 CREATE OR REPLACE FUNCTION update_updated_at()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -145,8 +142,6 @@ CREATE TRIGGER set_updated_at_rt
 ALTER TABLE users                  ENABLE ROW LEVEL SECURITY;
 ALTER TABLE financial_profiles     ENABLE ROW LEVEL SECURITY;
 ALTER TABLE profile_members        ENABLE ROW LEVEL SECURITY;
-ALTER TABLE categories             ENABLE ROW LEVEL SECURITY;
-ALTER TABLE transactions           ENABLE ROW LEVEL SECURITY;
 ALTER TABLE budgets                ENABLE ROW LEVEL SECURITY;
 ALTER TABLE goals                  ENABLE ROW LEVEL SECURITY;
 ALTER TABLE debts                  ENABLE ROW LEVEL SECURITY;
