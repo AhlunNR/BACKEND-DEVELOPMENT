@@ -26,6 +26,7 @@ CREATE TABLE IF NOT EXISTS profile_members (
   email       TEXT        NOT NULL,
   role        TEXT        NOT NULL CHECK (role IN ('owner', 'editor', 'viewer')) DEFAULT 'viewer',
   status      TEXT        NOT NULL CHECK (status IN ('pending', 'accepted')) DEFAULT 'pending',
+  notes            TEXT,
   created_at  TIMESTAMPTZ DEFAULT NOW(),
   UNIQUE (profile_id, email)
 );
