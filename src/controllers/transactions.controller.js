@@ -11,7 +11,7 @@ export const getTransactions = async (req, res, next) => {
     let q = supabaseAdmin
       .from('transactions')
       .select('*, categories(name, icon, color)', { count: 'exact' })
-      .eq('user_id', req.user.id)
+      .eq('profile_id', req.profile.id)
       .order('date', { ascending: false })
       .order('created_at', { ascending: false })
       .range(offset, offset + Number(limit) - 1);
@@ -33,6 +33,7 @@ export const getTransactions = async (req, res, next) => {
 
     return res.json({
       data: rows,
+      profile: { id: req.profile.id, name: req.profile.name, type: req.profile.type },
       pagination: {
         page:       Number(page),
         limit:      Number(limit),
@@ -51,7 +52,7 @@ export const getTransaction = async (req, res, next) => {
       .from('transactions')
       .select('*, categories(name, icon, color)')
       .eq('id', req.params.id)
-      .eq('user_id', req.user.id)
+      .eq('profile_id', req.profile.id)
       .maybeSingle();
 
     if (error) throw error;
@@ -75,7 +76,7 @@ export const createTransaction = async (req, res, next) => {
         .from('categories')
         .select('id')
         .eq('id', category_id)
-        .eq('user_id', req.user.id)
+        .eq('profile_id', req.profile.id)
         .maybeSingle();
       if (!cat) return next(new AppError('Category not found', 404, 'NotFound'));
     }
@@ -84,6 +85,7 @@ export const createTransaction = async (req, res, next) => {
       .from('transactions')
       .insert({
         user_id:     req.user.id,
+        profile_id:  req.profile.id,
         category_id: category_id || null,
         type,
         amount,
@@ -111,7 +113,7 @@ export const updateTransaction = async (req, res, next) => {
       .from('transactions')
       .select('id')
       .eq('id', id)
-      .eq('user_id', req.user.id)
+      .eq('profile_id', req.profile.id)
       .maybeSingle();
 
     if (!existing) return next(new AppError('Transaction not found', 404, 'NotFound'));
@@ -129,7 +131,7 @@ export const updateTransaction = async (req, res, next) => {
       .from('transactions')
       .update(updates)
       .eq('id', id)
-      .eq('user_id', req.user.id)
+      .eq('profile_id', req.profile.id)
       .select()
       .single();
 
@@ -146,7 +148,7 @@ export const deleteTransaction = async (req, res, next) => {
       .from('transactions')
       .delete()
       .eq('id', req.params.id)
-      .eq('user_id', req.user.id)
+      .eq('profile_id', req.profile.id)
       .select('id')
       .maybeSingle();
 
@@ -170,11 +172,11 @@ export const scanReceipt = async (req, res, next) => {
     res.json({
       message: 'Receipt scanned successfully',
       data: {
-        url: receiptUrl,
-        extracted_text: extracted.rawText,
+        url:             receiptUrl,
+        extracted_text:  extracted.rawText,
         suggested_total: extracted.suggestedTotal,
-        suggested_date: extracted.suggestedDate
-      }
+        suggested_date:  extracted.suggestedDate,
+      },
     });
   } catch (error) {
     next(error);

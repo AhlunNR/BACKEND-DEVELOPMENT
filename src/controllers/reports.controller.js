@@ -28,7 +28,7 @@ export const getReport = async (req, res, next) => {
     let q = supabaseAdmin
       .from('transactions')
       .select('*, categories(name, icon)')
-      .eq('user_id', req.user.id)
+      .eq('profile_id', req.profile.id)
       .gte('date', start)
       .lte('date', end)
       .order('date', { ascending: true });
@@ -49,7 +49,8 @@ export const getReport = async (req, res, next) => {
     return res.json({
       data: rows,
       summary: {
-        period: { start, end },
+        profile:       { id: req.profile.id, name: req.profile.name, type: req.profile.type },
+        period:        { start, end },
         total_income:  totals.total_income,
         total_expense: totals.total_expense,
         profit_loss:   totals.total_income - totals.total_expense,
@@ -64,16 +65,16 @@ export const getReport = async (req, res, next) => {
 export const exportCSV = async (req, res, next) => {
   try {
     const { start, end } = getDateRange(req.query);
-    const { type, category_id, user_id } = req.query;
+    const { type, category_id } = req.query;
 
     let q = supabaseAdmin
       .from('transactions')
       .select('date, type, amount, description, note, categories(name)')
+      .eq('profile_id', req.profile.id)
       .gte('date', start)
       .lte('date', end)
       .order('date', { ascending: true });
 
-    if (user_id)    q = q.eq('user_id', user_id);
     if (type && ['income', 'expense'].includes(type)) q = q.eq('type', type);
     if (category_id) q = q.eq('category_id', category_id);
 
@@ -95,7 +96,8 @@ export const exportCSV = async (req, res, next) => {
       )
       .join('\n');
 
-    const filename = `kasflow_report_${Date.now()}.csv`;
+    const profileSlug = req.profile.name.replace(/\s+/g, '_').toLowerCase();
+    const filename = `kasflow_${profileSlug}_report_${Date.now()}.csv`;
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     res.send('\uFEFF' + header + body);
@@ -107,16 +109,16 @@ export const exportCSV = async (req, res, next) => {
 export const exportPDF = async (req, res, next) => {
   try {
     const { start, end } = getDateRange(req.query);
-    const { type, category_id, user_id, full_name: qName, email: qEmail } = req.query;
+    const { type, category_id } = req.query;
 
     let q = supabaseAdmin
       .from('transactions')
       .select('date, type, amount, description, categories(name)')
+      .eq('profile_id', req.profile.id)
       .gte('date', start)
       .lte('date', end)
       .order('date', { ascending: true });
 
-    if (user_id)    q = q.eq('user_id', user_id);
     if (type && ['income', 'expense'].includes(type)) q = q.eq('type', type);
     if (category_id) q = q.eq('category_id', category_id);
 
@@ -126,31 +128,18 @@ export const exportPDF = async (req, res, next) => {
     const txRows     = (txData || []).map(({ categories: cat, ...t }) => ({ ...t, category: cat?.name ?? null }));
     const totals     = buildTotals(txRows);
     const profitLoss = totals.total_income - totals.total_expense;
-    let userName  = qName  || null;
-    let userEmail = qEmail || null;
 
-    if ((!userName || !userEmail) && user_id) {
-      const { data: dbUser } = await supabaseAdmin
-        .from('users').select('full_name, email').eq('id', user_id).maybeSingle();
-      if (dbUser) {
-        userName  = userName  || dbUser.full_name;
-        userEmail = userEmail || dbUser.email;
-      }
-      if (!userName || !userEmail) {
-        const { data: authData } = await supabaseAdmin.auth.admin.getUserById(user_id);
-        if (authData?.user) {
-          userName  = userName  || authData.user.user_metadata?.full_name || authData.user.user_metadata?.name || null;
-          userEmail = userEmail || authData.user.email || null;
-        }
-      }
-    }
-    const user = { full_name: userName, email: userEmail };
+    const { data: dbUser } = await supabaseAdmin
+      .from('users').select('full_name, email').eq('id', req.user.id).maybeSingle();
+    const userName  = dbUser?.full_name || null;
+    const userEmail = dbUser?.email     || null;
 
     const formatRp   = (n) => `Rp ${Number(n).toLocaleString('id-ID', { minimumFractionDigits: 0 })}`;
     const formatDate = (d) => new Date(d).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' });
 
-    const doc      = new PDFDocument({ margin: 40, size: 'A4' });
-    const filename = `kasflow_report_${Date.now()}.pdf`;
+    const doc = new PDFDocument({ margin: 40, size: 'A4' });
+    const profileSlug = req.profile.name.replace(/\s+/g, '_').toLowerCase();
+    const filename = `kasflow_${profileSlug}_report_${Date.now()}.pdf`;
 
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
@@ -160,8 +149,10 @@ export const exportPDF = async (req, res, next) => {
        .fontSize(12).fillColor('#374151').text('Laporan Keuangan', { align: 'center' })
        .moveDown(0.3);
 
-    doc.fontSize(10).fillColor('#6b7280')
-       .text(`Nama: ${user.full_name || '-'}   |   Email: ${user.email || '-'}`, { align: 'center' })
+    doc.fontSize(10).fillColor('#6366f1')
+       .text(`Profil: ${req.profile.name} (${req.profile.type === 'business' ? 'Bisnis' : 'Personal'})`, { align: 'center' })
+       .fillColor('#6b7280')
+       .text(`Nama: ${userName || '-'}   |   Email: ${userEmail || '-'}`, { align: 'center' })
        .text(`Periode: ${formatDate(start)} - ${formatDate(end)}`, { align: 'center' })
        .moveDown(1);
 

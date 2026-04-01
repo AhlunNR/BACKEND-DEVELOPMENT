@@ -1,19 +1,7 @@
 import cron from 'node-cron';
-import nodemailer from 'nodemailer';
+import { sendEmail } from '../utils/mailer.js';
 import { supabaseAdmin } from '../config/supabase.js';
 import config from '../config/config.js';
-
-export function createTransporter() {
-  return nodemailer.createTransport({
-    host:   config.smtp.host,
-    port:   config.smtp.port,
-    secure: config.smtp.secure,
-    auth: {
-      user: config.smtp.user,
-      pass: config.smtp.pass,
-    },
-  });
-}
 
 export function buildReminderHtml(name = 'Pengguna KasFlow') {
   return `
@@ -40,13 +28,9 @@ export function buildReminderHtml(name = 'Pengguna KasFlow') {
   `;
 }
 
-export async function sendReminderEmail(transporter, email, fullName) {
-  return transporter.sendMail({
-    from:    config.smtp.from,
-    to:      email,
-    subject: '🔔 Jangan lupa catat transaksi hari ini – KasFlow',
-    html:    buildReminderHtml(fullName),
-  });
+export async function sendReminderEmail(email, fullName) {
+  const html = buildReminderHtml(fullName);
+  return sendEmail(email, '🔔 Jangan lupa catat transaksi hari ini – KasFlow', html);
 }
 
 export const runDailyReminder = async () => {
@@ -69,12 +53,9 @@ export const runDailyReminder = async () => {
 
   if (!usersToRemind.length) return { sent: 0, total: 0 };
 
-  const transporter = createTransporter();
-  let sent = 0;
-
   for (const user of usersToRemind) {
     try {
-      await sendReminderEmail(transporter, user.email, user.full_name);
+      await sendReminderEmail(user.email, user.full_name);
       sent++;
       console.log(`[cron] Reminder sent → ${user.email}`);
     } catch (err) {

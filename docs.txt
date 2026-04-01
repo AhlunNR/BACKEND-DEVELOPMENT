@@ -1,63 +1,663 @@
-DOKUMENTASI KASFLOW API - UPDATE FITUR NOTIFIKASI & OCR
+KASFLOW API DOCUMENTATION
+Base URL: https://capstone-backend-lovat.vercel.app
+Semua endpoint (kecuali auth) memerlukan header: Authorization: Bearer <access_token>
 
 =========================================================
-FITUR PENGUMUMAN GLOBAL (NOTIFIKASI)
-Fitur ini digunakan untuk mengambil daftar pengumuman dari Admin agar dapat ditampilkan di Frontend (misalnya berupa popup, banner, atau riwayat lonceng aplikasi yang sama untuk semua orang).
-Karena notifikasi sekarang bersifat global, tidak ada konsep "sudah dibaca per user" di database. Hal tersebut dapat dihandle dari local storage / cookies aplikasi Frontend.
+MULTI-PROFILE SYSTEM — PANDUAN LENGKAP
+=========================================================
 
-1. GET ALL GLOBAL NOTIFICATIONS
-   URL: GET /api/v1/notifications
-   Query Params (Opsional):
-     - page: nomor halaman (default: 1)
-     - limit: jumlah data per halaman (default: 20)
-   Headers: Authorization: Bearer <token>
-   
-   Response Success (200 OK):
-   {
-     "data": [
-       {
-         "id": "uuid-notif",
-         "title": "Maintenance Server",
-         "message": "Akan ada perbaikan rutin pada jam 2 malam.",
-         "type": "warning", // "info", "warning", "success", "error"
-         "created_at": "2023-10-12T..."
-       }
-     ],
-     "pagination": { "page": 1, "limit": 20, "total": 1, "totalPages": 1 }
-   }
+KONSEP DASAR:
+  1 Akun = Banyak Profil Keuangan
+  Tidak perlu buat akun baru untuk mengelola keuangan bisnis.
+  Cukup 1 login (Google/GitHub), lalu buat profil "Bisnis" di dalam akun yang sama.
+
+Struktur data:
+  User (1 akun)
+    └── Profil "Personal"    ← dibuat otomatis saat pertama login (is_default: true)
+          ├── Kategori personal: Gaji, Belanja, Makanan, dll
+          └── Transaksi personal
+    └── Profil "Toko ABC"    ← dibuat manual oleh user
+          ├── Kategori bisnis: Penjualan, Bahan Baku, Gaji Karyawan, dll
+          └── Transaksi bisnis
+
+ISOLASI DATA:
+  Data setiap profil 100% terpisah. Transaksi di profil "Toko ABC" tidak
+  akan muncul di dashboard "Personal", dan sebaliknya.
+
+CARA PAKAI (Aturan profile_id):
+  - Jika TIDAK mengirim profile_id → otomatis pakai profil default (is_default: true)
+  - Jika ingin pakai profil lain  → kirim ?profile_id=<uuid> di query string
+  - profile_id berlaku di: /categories, /transactions, /dashboard/*, /reports/*
+  - /profiles itu sendiri TIDAK memerlukan profile_id
+
+FLOW FRONTEND YANG DIREKOMENDASIKAN:
+  1. Saat user login → GET /api/v1/profiles
+     Simpan daftar profil di state aplikasi.
+     Tandai profil aktif = yang is_default: true.
+
+  2. User ingin tambah profil bisnis → tampilkan form → POST /api/v1/profiles
+     { "name": "Toko ABC", "type": "business" }
+     Simpan id dari response sebagai profil baru.
+
+  3. User switch profil (klik dropdown) → update state "activeProfileId"
+     Semua API call berikutnya sertakan ?profile_id=<activeProfileId>
+     atau simpan di header/context dan inject otomatis.
+
+  4. Untuk set profil default baru →
+     PATCH /api/v1/profiles/:id/default
+
+KATEGORI OTOMATIS PER TIPE PROFIL:
+  Saat profil "Personal" pertama kali dibuat (login pertama), backend otomatis
+  seed kategori: Gaji, Investasi, Makanan & Minum, Transportasi, Belanja, dll.
+
+  Saat profil "Bisnis" dibuat MANUAL (bukan auto-seed), frontend perlu
+  meminta user mengisi kategori sendiri, atau buat kategori via:
+  POST /api/v1/categories?profile_id=<bisnis-profile-id>
+  { "name": "Penjualan", "type": "income" }
+
+CATATAN PENTING:
+  - Satu user wajib punya minimal 1 profil. Profil terakhir tidak bisa dihapus.
+  - Profil default tidak bisa langsung dihapus. Harus set profil lain sebagai
+    default dulu via PATCH /api/v1/profiles/:id/default, baru hapus yang lama.
+  - Profil "Personal" = kategori untuk keuangan pribadi sehari-hari.
+    Profil "Business" = kategori untuk pembukuan usaha/bisnis.
+
 
 =========================================================
-PENGELOLAAN PENGUMUMAN VIA ADMIN PANEL
-Admin sekarang dapat melihat, membuat, mengedit, dan menghapus pengumuman secara langsung di Dashboard Admin Panel /admin-panel. Fitur ini terletak pada Tab "Pengumuman Global".
+1. AUTH
+=========================================================
+
+GET /api/v1/auth/google
+  Redirect ke Google OAuth login.
+
+GET /api/v1/auth/github
+  Redirect ke GitHub OAuth login.
+
+GET /api/v1/auth/me
+  Headers: Authorization: Bearer <token>
+  Response 200:
+  {
+    "data": {
+      "id": "uuid-user",
+      "email": "user@example.com",
+      "full_name": "Nama User",
+      "avatar_url": "https://...",
+      "created_at": "2024-01-01T00:00:00Z"
+    }
+  }
+
+POST /api/v1/auth/logout
+  Headers: Authorization: Bearer <token>
+  Response 200:
+  { "message": "Logged out successfully" }
 
 =========================================================
-CRON JOBS (OTOMATISASI SERVER)
-- "Daily Reminder Email" yang tadinya berjalan otomatis setiap jam 08:00 WIB, kini telah diubah ke jadwal jam 10:00 WIB (Sesuai konfigurasi Vercel Crons `0 3 * * *`).
+2. PROFILES (Financial Profiles)
+=========================================================
+
+GET /api/v1/profiles
+  Response 200:
+  {
+    "data": [
+      {
+        "id": "uuid-profile",
+        "user_id": "uuid-user",
+        "name": "Personal",
+        "type": "personal",
+        "icon": "👤",
+        "color": "#6366f1",
+        "is_default": true,
+        "created_at": "2024-01-01T00:00:00Z"
+      },
+      {
+        "id": "uuid-profile-2",
+        "user_id": "uuid-user",
+        "name": "Toko ABC",
+        "type": "business",
+        "icon": "🏢",
+        "color": "#6366f1",
+        "is_default": false,
+        "created_at": "2024-01-02T00:00:00Z"
+      }
+    ]
+  }
+
+POST /api/v1/profiles
+  Body (JSON):
+  {
+    "name": "Toko ABC",
+    "type": "business",
+    "icon": "🏢",
+    "color": "#6366f1"
+  }
+  Response 201:
+  {
+    "data": { ...profile object },
+    "message": "Profile created"
+  }
+
+PUT /api/v1/profiles/:id
+  Body (JSON):
+  {
+    "name": "Toko XYZ",
+    "icon": "🏪",
+    "color": "#10b981"
+  }
+  Response 200:
+  {
+    "data": { ...profile object },
+    "message": "Profile updated"
+  }
+
+DELETE /api/v1/profiles/:id
+  Catatan: Tidak bisa hapus profil default atau profil satu-satunya.
+  Response 200:
+  { "message": "Profile deleted" }
+
+PATCH /api/v1/profiles/:id/default
+  Set profil sebagai default.
+  Response 200:
+  {
+    "data": { ...profile object (is_default: true) },
+    "message": "Default profile updated"
+  }
 
 =========================================================
-FITUR OCR & STRUK
+3. CATEGORIES
+=========================================================
+Semua endpoint otomatis filter berdasarkan profil aktif.
 
-1. Endpoint Baru: Scan Struk (OCR)
-   URL: POST /api/v1/transactions/ocr
-   Headers: 
-     - Authorization: Bearer <token>
-     - Content-Type: multipart/form-data
-   Body:
-     - receipt (File Gambar): Foto dari struk yang akan discan.
-   
-   Response:
-   Mengembalikan url gambar (dari catbox.moe) dan "suggested_total" serta "suggested_date".
+GET /api/v1/categories
+  Query Params (Opsional):
+    - profile_id: uuid (default: profil default user)
+    - type: "income" | "expense"
+  Response 200:
+  {
+    "data": [
+      {
+        "id": "uuid-cat",
+        "user_id": "uuid-user",
+        "profile_id": "uuid-profile",
+        "name": "Gaji",
+        "type": "income",
+        "icon": "briefcase",
+        "color": "#22c55e",
+        "is_default": true,
+        "created_at": "2024-01-01T00:00:00Z"
+      }
+    ]
+  }
 
-2. Update Endpoint: Create & Update Transaction
-   URL: POST /api/v1/transactions   (dan PUT)
-   Sekarang menerima parameter opsional baru yaitu `receipt_url`.
-   
-   Body (JSON):
-   {
-     "type": "expense",
-     "amount": 50000,
-     "description": "Beli Bahan Baku",
-     "category_id": "uuid-kategori",
-     "date": "2023-10-12",
-     "receipt_url": "https://files.catbox.moe/xxxxx.jpg"  // <---- Parameter Baru (Menerima string kosong url "")
-   }
+POST /api/v1/categories
+  Query Params (Opsional): profile_id
+  Body (JSON):
+  {
+    "name": "Bonus",
+    "type": "income",
+    "icon": "gift",
+    "color": "#f59e0b"
+  }
+  Response 201:
+  {
+    "data": { ...category object },
+    "message": "Category created"
+  }
+
+PUT /api/v1/categories/:id
+  Query Params (Opsional): profile_id
+  Body (JSON):
+  {
+    "name": "Bonus Tahunan",
+    "icon": "star",
+    "color": "#facc15"
+  }
+  Response 200:
+  {
+    "data": { ...category object },
+    "message": "Category updated"
+  }
+
+DELETE /api/v1/categories/:id
+  Query Params (Opsional): profile_id
+  Catatan: Tidak bisa hapus kategori default (is_default: true).
+  Response 200:
+  { "message": "Category deleted" }
+
+=========================================================
+4. TRANSACTIONS
+=========================================================
+Semua endpoint otomatis filter berdasarkan profil aktif.
+
+GET /api/v1/transactions
+  Query Params (Opsional):
+    - profile_id: uuid
+    - type: "income" | "expense"
+    - category_id: uuid
+    - start_date: YYYY-MM-DD
+    - end_date: YYYY-MM-DD
+    - page: integer (default: 1)
+    - limit: integer (default: 20, max pagination)
+  Response 200:
+  {
+    "data": [
+      {
+        "id": "uuid-tx",
+        "user_id": "uuid-user",
+        "profile_id": "uuid-profile",
+        "category_id": "uuid-cat",
+        "type": "expense",
+        "amount": "50000.00",
+        "description": "Beli bahan baku",
+        "note": "Supplier A",
+        "date": "2024-03-01",
+        "receipt_url": "https://files.catbox.moe/xxx.jpg",
+        "created_at": "2024-03-01T10:00:00Z",
+        "updated_at": "2024-03-01T10:00:00Z",
+        "category_name": "Bahan Baku",
+        "category_icon": "package",
+        "category_color": "#ef4444"
+      }
+    ],
+    "profile": { "id": "uuid-profile", "name": "Toko ABC", "type": "business" },
+    "pagination": { "page": 1, "limit": 20, "total": 45, "totalPages": 3 }
+  }
+
+GET /api/v1/transactions/:id
+  Query Params (Opsional): profile_id
+  Response 200:
+  { "data": { ...transaction object dengan category_name, category_icon, category_color } }
+
+POST /api/v1/transactions
+  Query Params (Opsional): profile_id
+  Body (JSON):
+  {
+    "type": "expense",
+    "amount": 50000,
+    "description": "Beli bbm",
+    "category_id": "uuid-cat",
+    "note": "SPBU Pertamina",
+    "date": "2024-03-15",
+    "receipt_url": "https://..."
+  }
+  Response 201:
+  {
+    "data": { ...transaction object },
+    "message": "Transaction created"
+  }
+
+PUT /api/v1/transactions/:id
+  Query Params (Opsional): profile_id
+  Body (JSON): field yang ingin diupdate (semua opsional):
+  {
+    "type": "expense",
+    "amount": 75000,
+    "description": "Beli bbm (update)",
+    "category_id": "uuid-cat",
+    "note": "SPBU Shell",
+    "date": "2024-03-15",
+    "receipt_url": "https://..."
+  }
+  Response 200:
+  {
+    "data": { ...transaction object },
+    "message": "Transaction updated"
+  }
+
+DELETE /api/v1/transactions/:id
+  Query Params (Opsional): profile_id
+  Response 200:
+  { "message": "Transaction deleted" }
+
+POST /api/v1/transactions/ocr
+  Headers: Content-Type: multipart/form-data
+  Body (form-data):
+    - receipt: File gambar struk (jpg/png, max 5MB)
+  Response 200:
+  {
+    "message": "Receipt scanned successfully",
+    "data": {
+      "url": "https://files.catbox.moe/xxx.jpg",
+      "extracted_text": "...",
+      "suggested_total": 75000,
+      "suggested_date": "2024-03-15"
+    }
+  }
+
+=========================================================
+5. DASHBOARD
+=========================================================
+Semua endpoint filter berdasarkan profil aktif.
+
+GET /api/v1/dashboard/summary
+  Query Params (Opsional):
+    - profile_id: uuid
+    - month: 1-12 (default: bulan ini)
+    - year: YYYY (default: tahun ini)
+  Response 200:
+  {
+    "data": {
+      "profile": { "id": "uuid-profile", "name": "Personal", "type": "personal" },
+      "period": { "month": "03", "year": "2024", "startDate": "2024-03-01", "endDate": "2024-03-31" },
+      "total_income": 5000000,
+      "total_expense": 2500000,
+      "profit_loss": 2500000,
+      "transaction_count": 12,
+      "balance": 12500000
+    }
+  }
+
+GET /api/v1/dashboard/chart
+  Query Params (Opsional):
+    - profile_id: uuid
+    - months: 1-12 (default: 6, data N bulan terakhir)
+  Response 200:
+  {
+    "data": [
+      { "month": "2024-01", "income": 5000000, "expense": 2000000, "profit_loss": 3000000 },
+      { "month": "2024-02", "income": 4500000, "expense": 3000000, "profit_loss": 1500000 }
+    ]
+  }
+
+GET /api/v1/dashboard/recent
+  Query Params (Opsional):
+    - profile_id: uuid
+    - limit: integer (default: 10, max: 50)
+  Response 200:
+  {
+    "data": [ ...array transaction terbaru dengan category_name, category_icon, category_color ]
+  }
+
+GET /api/v1/dashboard/top-categories
+  Query Params (Opsional):
+    - profile_id: uuid
+    - type: "income" | "expense" (default: "expense")
+    - month: 1-12 (default: bulan ini)
+    - year: YYYY (default: tahun ini)
+  Response 200:
+  {
+    "data": [
+      { "id": "uuid-cat", "name": "Bahan Baku", "icon": "package", "color": "#ef4444", "total": 2500000, "count": 8 }
+    ]
+  }
+
+=========================================================
+6. REPORTS
+=========================================================
+Semua endpoint filter berdasarkan profil aktif.
+
+GET /api/v1/reports
+  Query Params (Opsional):
+    - profile_id: uuid
+    - start_date: YYYY-MM-DD (default: awal bulan ini)
+    - end_date: YYYY-MM-DD (default: hari ini)
+    - type: "income" | "expense"
+    - category_id: uuid
+  Response 200:
+  {
+    "data": [ ...array transaksi dengan category_name dan category_icon ],
+    "summary": {
+      "profile": { "id": "uuid-profile", "name": "Toko ABC", "type": "business" },
+      "period": { "start": "2024-03-01", "end": "2024-03-31" },
+      "total_income": 10000000,
+      "total_expense": 4500000,
+      "profit_loss": 5500000,
+      "count": 25
+    }
+  }
+
+GET /api/v1/reports/export/csv
+  Query Params (Opsional): profile_id, start_date, end_date, type, category_id
+  Response: File CSV (Content-Disposition: attachment)
+  Kolom: Tanggal, Tipe, Kategori, Jumlah, Deskripsi, Catatan
+
+GET /api/v1/reports/export/pdf
+  Query Params (Opsional): profile_id, start_date, end_date, type, category_id
+  Response: File PDF (Content-Disposition: attachment)
+  Isi: Header profil, summary keuangan, tabel transaksi
+
+=========================================================
+7. NOTIFICATIONS (Global)
+=========================================================
+Notifikasi bersifat global (sama untuk semua user). Tidak ada konsep "sudah dibaca per user" di database — handle via localStorage/cookies di frontend.
+
+GET /api/v1/notifications
+  Query Params (Opsional):
+    - page: integer (default: 1)
+    - limit: integer (default: 20)
+  Response 200:
+  {
+    "data": [
+      {
+        "id": "uuid-notif",
+        "title": "Maintenance Server",
+        "message": "Akan ada perbaikan rutin.",
+        "type": "warning",
+        "created_at": "2024-03-01T00:00:00Z"
+      }
+    ],
+    "pagination": { "page": 1, "limit": 20, "total": 3, "totalPages": 1 }
+  }
+
+=========================================================
+ERROR RESPONSES (Semua Endpoint)
+=========================================================
+400 Bad Request:     { "error": "BadRequest", "message": "..." }
+401 Unauthorized:    { "error": "Unauthorized", "message": "Missing or invalid token" }
+404 Not Found:       { "error": "NotFound", "message": "..." }
+409 Conflict:        { "error": "ConflictError", "message": "..." }
+500 Internal Error:  { "error": "InternalServerError", "message": "..." }
+
+=========================================================
+CRON JOBS
+=========================================================
+- Daily Reminder Email: setiap hari jam 10:00 WIB (cron: 0 3 * * *)
+- Manual trigger: GET /api/v1/cron/daily-reminder (tanpa auth)
+- Recurring Transactions: setiap hari jam 08:00 WIB (cron: 0 1 * * *)
+- Manual trigger: GET /api/v1/cron/recurring (tanpa auth)
+
+=========================================================
+8. PROFILE MEMBERS (Kolaborasi Profil)
+=========================================================
+GET /api/v1/members?profile_id=<uuid>
+  Melihat daftar member.
+
+POST /api/v1/members/invite?profile_id=<uuid>
+  Mengundang member via email (Role: owner, editor, viewer).
+  Body: { "email": "...", "role": "editor" }
+
+POST /api/v1/members/:id/accept
+  Menerima undangan kolaborasi (hanya bisa dipanggil user dengan email yang sesuai).
+
+DELETE /api/v1/members/:id
+  Menghapus member dari profil.
+
+=========================================================
+9. BUDGETS (Anggaran)
+=========================================================
+GET /api/v1/budgets?profile_id=<uuid>&month=MM&year=YYYY
+  Melihat daftar budget bulan tertentu.
+
+POST /api/v1/budgets?profile_id=<uuid>
+  Membuat aturan budget untuk kategori tertentu.
+  Body: { "category_id": "...", "amount": 1000000, "month": 3, "year": 2024 }
+
+PUT /api/v1/budgets/:id
+  Update budget amount.
+
+DELETE /api/v1/budgets/:id
+  Hapus budget.
+
+=========================================================
+10. GOALS (Tujuan Keuangan)
+=========================================================
+GET /api/v1/goals?profile_id=<uuid>
+  List semua goals tabungan.
+
+POST /api/v1/goals?profile_id=<uuid>
+  Buat goal menabung.
+  Body: { "name": "Beli Motor", "target_amount": 15000000, "deadline": "2024-12-31" }
+
+PUT /api/v1/goals/:id
+  Update data goal atau tambah current_amount.
+
+DELETE /api/v1/goals/:id
+  Hapus goal.
+
+=========================================================
+11. DEBTS (Hutang Piutang)
+=========================================================
+GET /api/v1/debts?profile_id=<uuid>
+  List semua catatan hutang/piutang.
+
+POST /api/v1/debts?profile_id=<uuid>
+  Buat catatan hutang (payable) atau piutang (receivable).
+  Body: { "name": "Pinjaman Bank", "type": "payable", "amount": 50000000, "due_date": "2025-01-01" }
+
+PUT /api/v1/debts/:id
+  Update data hutang.
+
+POST /api/v1/debts/:id/pay
+  Catat pembayaran (mencicil) hutang.
+
+DELETE /api/v1/debts/:id
+  Hapus catatan hutang.
+
+=========================================================
+12. RECURRING TRANSACTIONS (Transaksi Berulang)
+=========================================================
+GET /api/v1/recurring?profile_id=<uuid>
+  List jadwal transaksi rutin otomatis.
+
+POST /api/v1/recurring?profile_id=<uuid>
+  Catat langganan / transaksi berulang otomatis.
+  Body: { "category_id": "...", "type": "expense", "amount": 50000, "description": "Langganan Spotify", "frequency": "monthly", "next_date": "2024-04-15" }
+
+PUT /api/v1/recurring/:id
+  Update data transaksi berulang.
+
+DELETE /api/v1/recurring/:id
+  Hapus transaksi berulang.
+
+=========================================================
+BUSINESS PROFILE — KEAMANAN ENDPOINT
+=========================================================
+Semua endpoint di bawah (/products, /customers, /pos/*) hanya bisa diakses oleh:
+  - Owner dari profil business tersebut.
+  - Member yang statusnya "accepted" (owner/editor/viewer).
+  - Viewer TIDAK bisa melakukan operasi tulis (POST/PUT/DELETE/PATCH).
+  - Profil dengan type "personal" akan diblokir dengan 403 Forbidden.
+Query string ?profile_id=<uuid> WAJIB disertakan di semua endpoint business.
+
+=========================================================
+13. PRODUCTS (Manajemen Produk — Business Only)
+=========================================================
+GET /api/v1/products?profile_id=<uuid>
+  List semua produk. Tambahan: ?is_active=true, ?low_stock=true
+
+GET /api/v1/products/:id?profile_id=<uuid>
+  Detail produk.
+
+POST /api/v1/products?profile_id=<uuid>
+  Buat produk baru. (Editor/Owner only)
+  Body: { "name": "Nasi Goreng", "price": 15000, "cost_price": 8000, "stock": 100, "unit": "porsi", "category_id": "..." }
+
+PUT /api/v1/products/:id?profile_id=<uuid>
+  Update produk. (Editor/Owner only)
+
+PATCH /api/v1/products/:id/stock?profile_id=<uuid>
+  Adjust stok (+/-). (Editor/Owner only)
+  Body: { "adjustment": -5 }
+
+DELETE /api/v1/products/:id?profile_id=<uuid>
+  Hapus produk. (Editor/Owner only)
+
+=========================================================
+14. CUSTOMERS (Pelanggan — Business Only)
+=========================================================
+GET /api/v1/customers?profile_id=<uuid>
+  List semua pelanggan.
+
+GET /api/v1/customers/:id?profile_id=<uuid>
+  Detail pelanggan.
+
+POST /api/v1/customers?profile_id=<uuid>
+  Tambah pelanggan. (Editor/Owner only)
+  Body: { "name": "Budi", "phone": "08xxx", "email": "budi@email.com", "address": "Jl. ..." }
+
+PUT /api/v1/customers/:id?profile_id=<uuid>
+  Update pelanggan. (Editor/Owner only)
+
+DELETE /api/v1/customers/:id?profile_id=<uuid>
+  Hapus pelanggan. (Editor/Owner only)
+
+=========================================================
+15. POS — PAYMENT METHODS
+=========================================================
+GET /api/v1/pos/payment-methods?profile_id=<uuid>
+  List metode pembayaran aktif.
+
+POST /api/v1/pos/payment-methods?profile_id=<uuid>
+  Tambah metode bayar. (Editor/Owner only)
+  Body: { "name": "QRIS" }
+
+DELETE /api/v1/pos/payment-methods/:id?profile_id=<uuid>
+  Hapus metode bayar. (Editor/Owner only)
+
+=========================================================
+16. POS — VOUCHERS
+=========================================================
+GET /api/v1/pos/vouchers?profile_id=<uuid>
+  List semua voucher.
+
+POST /api/v1/pos/vouchers?profile_id=<uuid>
+  Buat voucher diskon. (Editor/Owner only)
+  Body: { "code": "HEMAT10", "discount_type": "percent", "discount_value": 10, "min_purchase": 50000, "valid_until": "2024-12-31" }
+
+PUT /api/v1/pos/vouchers/:id?profile_id=<uuid>
+  Update voucher.
+
+DELETE /api/v1/pos/vouchers/:id?profile_id=<uuid>
+  Hapus voucher.
+
+POST /api/v1/pos/vouchers/validate?profile_id=<uuid>
+  Validasi kode voucher sebelum checkout.
+  Body: { "code": "HEMAT10", "subtotal": 75000 }
+  Response: { data: { voucher: {...}, discount_amount: 7500 } }
+
+=========================================================
+17. POS — ORDERS
+=========================================================
+GET /api/v1/pos/orders?profile_id=<uuid>
+  List semua order. Tambahan: ?status=paid|pending|cancelled, ?start_date, ?end_date, ?page, ?limit
+
+GET /api/v1/pos/orders/:id?profile_id=<uuid>
+  Detail order + items.
+
+POST /api/v1/pos/orders?profile_id=<uuid>
+  Buat order baru (otomatis catat ke transactions, kurangi stok). (Editor/Owner only)
+  Body:
+  {
+    "items": [
+      { "product_id": "uuid", "quantity": 2 },
+      { "name": "Item Manual", "price": 5000, "quantity": 1 }
+    ],
+    "customer_id": "uuid",
+    "payment_method_id": "uuid",
+    "voucher_code": "HEMAT10",
+    "note": "..."
+  }
+
+POST /api/v1/pos/orders/:id/cancel?profile_id=<uuid>
+  Batalkan order (stok dikembalikan, transaksi dihapus). (Editor/Owner only)
+
+GET /api/v1/pos/orders/:id/receipt?profile_id=<uuid>
+  Download struk PDF dari order.
+
+=========================================================
+18. POS — LAPORAN PENJUALAN
+=========================================================
+GET /api/v1/pos/sales-report?profile_id=<uuid>
+  Laporan penjualan dengan profit/loss margin.
+  Tambahan: ?start_date=YYYY-MM-DD&end_date=YYYY-MM-DD
+  Response: { data: [...orders], summary: { total_orders, total_revenue, total_cost, gross_profit } }
+

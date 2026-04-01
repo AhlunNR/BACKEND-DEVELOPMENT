@@ -1,9 +1,11 @@
 import { Router } from 'express';
 import authenticate from '../middleware/auth.js';
+import resolveProfile from '../middleware/resolveProfile.js';
 import { getSummary, getChart, getRecentTransactions, getTopCategories } from '../controllers/dashboard.controller.js';
 
 const router = Router();
 router.use(authenticate);
+router.use(resolveProfile);
 
 router.get('/', (_req, res) => {
   res.json({

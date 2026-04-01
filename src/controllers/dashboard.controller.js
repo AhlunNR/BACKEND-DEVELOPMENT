@@ -13,13 +13,13 @@ export const getSummary = async (req, res, next) => {
       supabaseAdmin
         .from('transactions')
         .select('type, amount')
-        .eq('user_id', req.user.id)
+        .eq('profile_id', req.profile.id)
         .gte('date', startDate)
         .lte('date', endDate),
       supabaseAdmin
         .from('transactions')
         .select('type, amount')
-        .eq('user_id', req.user.id),
+        .eq('profile_id', req.profile.id),
     ]);
 
     const totalIncome  = (monthTx || []).filter(r => r.type === 'income').reduce((s, r) => s + Number(r.amount), 0);
@@ -28,7 +28,8 @@ export const getSummary = async (req, res, next) => {
 
     return res.json({
       data: {
-        period: { month: m, year: y, startDate, endDate },
+        profile:           { id: req.profile.id, name: req.profile.name, type: req.profile.type },
+        period:            { month: m, year: y, startDate, endDate },
         total_income:      totalIncome,
         total_expense:     totalExpense,
         profit_loss:       totalIncome - totalExpense,
@@ -51,7 +52,7 @@ export const getChart = async (req, res, next) => {
     const { data, error } = await supabaseAdmin
       .from('transactions')
       .select('type, amount, date')
-      .eq('user_id', req.user.id)
+      .eq('profile_id', req.profile.id)
       .gte('date', sinceStr)
       .order('date', { ascending: true });
 
@@ -87,7 +88,7 @@ export const getRecentTransactions = async (req, res, next) => {
     const { data, error } = await supabaseAdmin
       .from('transactions')
       .select('*, categories(name, icon, color)')
-      .eq('user_id', req.user.id)
+      .eq('profile_id', req.profile.id)
       .order('date', { ascending: false })
       .order('created_at', { ascending: false })
       .limit(limit);
@@ -119,7 +120,7 @@ export const getTopCategories = async (req, res, next) => {
     const { data, error } = await supabaseAdmin
       .from('transactions')
       .select('amount, category_id, categories(id, name, icon, color)')
-      .eq('user_id', req.user.id)
+      .eq('profile_id', req.profile.id)
       .eq('type', type)
       .gte('date', startDate)
       .lte('date', endDate)

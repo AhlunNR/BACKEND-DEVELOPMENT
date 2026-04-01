@@ -7,7 +7,7 @@ export const getCategories = async (req, res, next) => {
     let queryBuilder = supabaseAdmin
       .from('categories')
       .select('*')
-      .eq('user_id', req.user.id)
+      .eq('profile_id', req.profile.id)
       .order('is_default', { ascending: false })
       .order('name', { ascending: true });
 
@@ -28,7 +28,7 @@ export const createCategory = async (req, res, next) => {
     const { name, type, icon = 'tag', color = '#6366f1' } = req.body;
     const { data, error } = await supabaseAdmin
       .from('categories')
-      .insert({ user_id: req.user.id, name, type, icon, color })
+      .insert({ user_id: req.user.id, profile_id: req.profile.id, name, type, icon, color })
       .select()
       .single();
 
@@ -50,7 +50,7 @@ export const updateCategory = async (req, res, next) => {
       .from('categories')
       .select('id')
       .eq('id', id)
-      .eq('user_id', req.user.id)
+      .eq('profile_id', req.profile.id)
       .maybeSingle();
 
     if (!existing) return next(new AppError('Category not found', 404, 'NotFound'));
@@ -64,7 +64,7 @@ export const updateCategory = async (req, res, next) => {
       .from('categories')
       .update(updates)
       .eq('id', id)
-      .eq('user_id', req.user.id)
+      .eq('profile_id', req.profile.id)
       .select()
       .single();
 
@@ -82,7 +82,7 @@ export const deleteCategory = async (req, res, next) => {
       .from('categories')
       .select('id, is_default')
       .eq('id', id)
-      .eq('user_id', req.user.id)
+      .eq('profile_id', req.profile.id)
       .maybeSingle();
 
     if (!existing) return next(new AppError('Category not found', 404, 'NotFound'));
@@ -92,7 +92,7 @@ export const deleteCategory = async (req, res, next) => {
       .from('categories')
       .delete()
       .eq('id', id)
-      .eq('user_id', req.user.id);
+      .eq('profile_id', req.profile.id);
 
     if (error) throw error;
     return res.json({ message: 'Category deleted' });

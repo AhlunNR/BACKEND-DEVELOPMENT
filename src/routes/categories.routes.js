@@ -1,11 +1,13 @@
 import { Router } from 'express';
 import { body, param } from 'express-validator';
 import authenticate from '../middleware/auth.js';
+import resolveProfile from '../middleware/resolveProfile.js';
 import validate from '../middleware/validate.js';
 import { getCategories, createCategory, updateCategory, deleteCategory } from '../controllers/categories.controller.js';
 
 const router = Router();
 router.use(authenticate);
+router.use(resolveProfile);
 
 router.get('/', getCategories);
 

@@ -5,7 +5,6 @@ import { getGlobalNotifications } from '../controllers/notifications.controller.
 const router = Router();
 router.use(authenticate);
 
-// Global Announcement endpoint (Read-only for users)
 router.get('/', getGlobalNotifications);
 
 export default router;

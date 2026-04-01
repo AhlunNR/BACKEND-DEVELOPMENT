@@ -3,7 +3,20 @@ import config from '../config/config.js';
 
 const FRONTEND_URL = config.app.frontendUrl;
 
-const DEFAULT_CATEGORIES = [
+const DEFAULT_PERSONAL_CATEGORIES = [
+  { name: 'Gaji',               type: 'income',  icon: 'briefcase',    color: '#22c55e', is_default: true },
+  { name: 'Investasi',          type: 'income',  icon: 'trending-up',  color: '#06b6d4', is_default: true },
+  { name: 'Pendapatan Lainnya', type: 'income',  icon: 'dollar-sign',  color: '#84cc16', is_default: true },
+  { name: 'Makanan & Minum',    type: 'expense', icon: 'coffee',       color: '#ef4444', is_default: true },
+  { name: 'Transportasi',       type: 'expense', icon: 'truck',        color: '#8b5cf6', is_default: true },
+  { name: 'Belanja',            type: 'expense', icon: 'shopping-bag', color: '#f97316', is_default: true },
+  { name: 'Tagihan & Utilitas', type: 'expense', icon: 'zap',          color: '#f59e0b', is_default: true },
+  { name: 'Hiburan',            type: 'expense', icon: 'tv',           color: '#ec4899', is_default: true },
+  { name: 'Kesehatan',          type: 'expense', icon: 'heart',        color: '#10b981', is_default: true },
+  { name: 'Pengeluaran Lainnya',type: 'expense', icon: 'credit-card',  color: '#6b7280', is_default: true },
+];
+
+const DEFAULT_BUSINESS_CATEGORIES = [
   { name: 'Penjualan Produk',   type: 'income',  icon: 'shopping-cart', color: '#22c55e', is_default: true },
   { name: 'Jasa / Layanan',     type: 'income',  icon: 'wrench',        color: '#10b981', is_default: true },
   { name: 'Investasi',          type: 'income',  icon: 'trending-up',   color: '#06b6d4', is_default: true },
@@ -17,12 +30,46 @@ const DEFAULT_CATEGORIES = [
   { name: 'Pengeluaran Lainnya',type: 'expense', icon: 'credit-card',   color: '#6b7280', is_default: true },
 ];
 
-async function seedDefaultCategories(userId) {
-  const rows = DEFAULT_CATEGORIES.map((c) => ({ ...c, user_id: userId }));
+async function seedDefaultCategories(profileId, userId, profileType = 'personal') {
+  const template = profileType === 'business'
+    ? DEFAULT_BUSINESS_CATEGORIES
+    : DEFAULT_PERSONAL_CATEGORIES;
+
+  const rows = template.map((c) => ({ ...c, profile_id: profileId, user_id: userId }));
   await supabaseAdmin.from('categories').upsert(rows, {
-    onConflict: 'user_id,name,type',
+    onConflict: 'profile_id,name,type',
     ignoreDuplicates: true,
   });
+}
+
+async function seedDefaultProfile(userId) {
+  const { data: existing } = await supabaseAdmin
+    .from('financial_profiles')
+    .select('id')
+    .eq('user_id', userId)
+    .limit(1)
+    .maybeSingle();
+
+  if (existing) return existing;
+
+  const { data: profile, error } = await supabaseAdmin
+    .from('financial_profiles')
+    .insert({
+      user_id:    userId,
+      name:       'Personal',
+      type:       'personal',
+      icon:       '👤',
+      color:      '#6366f1',
+      is_default: true,
+    })
+    .select()
+    .single();
+
+  if (error) throw error;
+
+  await seedDefaultCategories(profile.id, userId, 'personal');
+
+  return profile;
 }
 
 async function upsertUser(user) {
@@ -43,7 +90,7 @@ async function upsertUser(user) {
     { onConflict: 'id' }
   );
 
-  if (isNew) await seedDefaultCategories(id);
+  if (isNew) await seedDefaultProfile(id);
 
   const { data: userRow } = await supabaseAdmin
     .from('users')
@@ -74,6 +121,7 @@ export const githubOAuth = async (_req, res) => {
 export const oauthCallback = async (_req, res) => {
   return res.redirect(`${FRONTEND_URL}/auth/callback`);
 };
+
 export const oauthImplicitCallback = async (req, res) => {
   const { access_token, refresh_token, expires_in } = req.query;
   if (!access_token) {

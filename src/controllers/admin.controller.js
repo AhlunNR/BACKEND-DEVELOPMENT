@@ -1,7 +1,8 @@
 import jwt from 'jsonwebtoken';
 import { supabaseAdmin } from '../config/supabase.js';
 import config from '../config/config.js';
-import { createTransporter, buildReminderHtml } from '../jobs/dailyReminder.js';
+import { buildReminderHtml } from '../jobs/dailyReminder.js';
+import { sendEmail } from '../utils/mailer.js';
 
 const ipTracker = new Map();
 const ADMIN_SECRET = config.supabase.serviceRoleKey || 'kasflow-secret-fallback';
@@ -40,24 +41,20 @@ export async function adminLogin(req, res, next) {
       ipTracker.set(ip, tracker);
 
       try {
-        const transporter = createTransporter();
-        await transporter.sendMail({
-          from: config.smtp.from,
-          to: 'radzzoffc@gmail.com',
-          subject: '🚨 [URGENT] Peringatan Pembobolan Panel Admin KasFlow',
-          html: `
-            <div style="font-family:sans-serif; padding: 20px;">
-              <h2 style="color: red;">Peringatan Keamanan</h2>
-              <p>Sistem mendeteksi 3 kali kegagalan login berturut-turut pada panel admin KasFlow.</p>
-              <ul>
-                <li><strong>Waktu Kejadian:</strong> ${new Date().toLocaleString('id-ID')}</li>
-                <li><strong>IP Pelaku:</strong> ${ip}</li>
-                <li><strong>Tindakan Sistem:</strong> IP tersebut telah otomatis diblokir selama 24 jam.</li>
-              </ul>
-              <p>Abaikan pesan ini jika ini adalah Anda. Namun jika bukan, segera periksa log server Anda.</p>
-            </div>
-          `
-        });
+        await sendEmail(
+          'radzzoffc@gmail.com',
+          '🚨 [URGENT] Peringatan Pembobolan Panel Admin KasFlow',
+          `<div style="font-family:sans-serif; padding: 20px;">
+            <h2 style="color: red;">Peringatan Keamanan</h2>
+            <p>Sistem mendeteksi 3 kali kegagalan login berturut-turut pada panel admin KasFlow.</p>
+            <ul>
+              <li><strong>Waktu Kejadian:</strong> ${new Date().toLocaleString('id-ID')}</li>
+              <li><strong>IP Pelaku:</strong> ${ip}</li>
+              <li><strong>Tindakan Sistem:</strong> IP tersebut telah otomatis diblokir selama 24 jam.</li>
+            </ul>
+            <p>Abaikan pesan ini jika ini adalah Anda. Namun jika bukan, segera periksa log server Anda.</p>
+          </div>`
+        );
       } catch (mailErr) {
       }
 
@@ -130,17 +127,11 @@ export async function sendEmailToUser(req, res, next) {
       targetName  = data.full_name;
     }
 
-    const transporter = createTransporter();
     const html = message
       ? buildCustomHtml(targetName, subject, message)
       : buildReminderHtml(targetName);
 
-    await transporter.sendMail({
-      from:    config.smtp.from,
-      to:      targetEmail,
-      subject: subject || '📩 Pesan dari KasFlow',
-      html,
-    });
+    await sendEmail(targetEmail, subject || '📩 Pesan dari KasFlow', html);
 
     res.json({ success: true, message: `Email sent to ${targetEmail}.` });
   } catch (err) {
@@ -161,18 +152,12 @@ export async function broadcastEmail(req, res, next) {
     if (error) throw error;
     if (!users?.length) return res.json({ success: true, sent: 0, total: 0 });
 
-    const transporter = createTransporter();
     let sent = 0;
     const failures = [];
 
     for (const user of users) {
       try {
-        await transporter.sendMail({
-          from:    config.smtp.from,
-          to:      user.email,
-          subject,
-          html:    buildCustomHtml(user.full_name, subject, message),
-        });
+        await sendEmail(user.email, subject, buildCustomHtml(user.full_name, subject, message));
         sent++;
       } catch (err) {
         failures.push({ email: user.email, error: err.message });
