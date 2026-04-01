@@ -223,6 +223,7 @@ CREATE INDEX IF NOT EXISTS idx_transactions_user_id    ON transactions(user_id);
 CREATE INDEX IF NOT EXISTS idx_transactions_profile_id ON transactions(profile_id);
 CREATE INDEX IF NOT EXISTS idx_transactions_date       ON transactions(date DESC);
 CREATE INDEX IF NOT EXISTS idx_transactions_type       ON transactions(type);
+CREATE INDEX IF NOT EXISTS idx_transactions_category_id ON transactions(category_id);
 CREATE INDEX IF NOT EXISTS idx_budgets_profile_id      ON budgets(profile_id);
 CREATE INDEX IF NOT EXISTS idx_goals_profile_id        ON goals(profile_id);
 CREATE INDEX IF NOT EXISTS idx_debts_profile_id        ON debts(profile_id);
