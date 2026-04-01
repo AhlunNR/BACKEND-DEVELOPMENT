@@ -393,6 +393,7 @@ CREATE INDEX IF NOT EXISTS idx_vouchers_code          ON vouchers(code);
 CREATE INDEX IF NOT EXISTS idx_pos_orders_profile_id  ON pos_orders(profile_id);
 CREATE INDEX IF NOT EXISTS idx_pos_items_order_id     ON pos_order_items(order_id);
 CREATE INDEX IF NOT EXISTS idx_payment_methods_profile ON payment_methods(profile_id);
+CREATE INDEX IF NOT EXISTS idx_pos_orders_status ON pos_orders(status);
 
 -- ============================================================
 -- Tabel notifications (global, tidak terikat user tertentu)
