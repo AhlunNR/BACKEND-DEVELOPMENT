@@ -1,10 +1,11 @@
-import { supabaseAnon as supabase } from '../config/supabase.js';
+import { supabaseAdmin as supabase } from '../config/supabase.js';
 
 export const getBudgets = async (req, res) => {
   try {
-    const { profile_id, month, year } = req.query;
-    if (!profile_id || !month || !year) {
-      return res.status(400).json({ error: 'BadRequest', message: 'profile_id, month, and year are required' });
+    const profile_id = req.profile.id;
+    const { month, year } = req.query;
+    if (!month || !year) {
+      return res.status(400).json({ error: 'BadRequest', message: 'month, and year are required' });
     }
     const { data: budgets, error } = await supabase
       .from('budgets')
@@ -21,12 +22,9 @@ export const getBudgets = async (req, res) => {
 
 export const createBudget = async (req, res) => {
   try {
-    const { profile_id } = req.query;
+    const profile_id = req.profile.id;
     const { category_id, amount, month, year } = req.body;
     const user_id = req.user.id;
-    if (!profile_id) {
-      return res.status(400).json({ error: 'BadRequest', message: 'profile_id required' });
-    }
     const { data: budget, error } = await supabase
       .from('budgets')
       .insert({ profile_id, user_id, category_id, amount, month, year })

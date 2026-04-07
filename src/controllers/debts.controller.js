@@ -1,11 +1,8 @@
-import { supabaseAnon as supabase } from '../config/supabase.js';
+import { supabaseAdmin as supabase } from '../config/supabase.js';
 
 export const getDebts = async (req, res) => {
   try {
-    const { profile_id } = req.query;
-    if (!profile_id) {
-      return res.status(400).json({ error: 'BadRequest', message: 'profile_id required' });
-    }
+    const profile_id = req.profile.id;
     const { data: debts, error } = await supabase
       .from('debts')
       .select('*')
@@ -20,12 +17,9 @@ export const getDebts = async (req, res) => {
 
 export const createDebt = async (req, res) => {
   try {
-    const { profile_id } = req.query;
+    const profile_id = req.profile.id;
     const { name, type, amount, due_date } = req.body;
     const user_id = req.user.id;
-    if (!profile_id) {
-      return res.status(400).json({ error: 'BadRequest', message: 'profile_id required' });
-    }
     const { data: debt, error } = await supabase
       .from('debts')
       .insert({ profile_id, user_id, name, type, amount, remaining_amount: amount, due_date, status: 'unpaid' })

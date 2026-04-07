@@ -1,20 +1,19 @@
 import { Router } from 'express';
 import { body, query, param } from 'express-validator';
 import { validate } from '../middleware/validate.js';
+import authenticate from '../middleware/auth.js';
+import resolveProfile from '../middleware/resolveProfile.js';
 import { getDebts, createDebt, updateDebt, payDebt, deleteDebt } from '../controllers/debts.controller.js';
 
 const router = Router();
+router.use(authenticate);
+router.use(resolveProfile);
 
-router.get(
-  '/',
-  validate([query('profile_id').isUUID().withMessage('Invalid profile_id')]),
-  getDebts
-);
+router.get('/', getDebts);
 
 router.post(
   '/',
   validate([
-    query('profile_id').isUUID().withMessage('Invalid profile_id'),
     body('name').notEmpty().withMessage('Name is required'),
     body('type').isIn(['payable', 'receivable']).withMessage('Invalid type'),
     body('amount').isNumeric().withMessage('amount required'),

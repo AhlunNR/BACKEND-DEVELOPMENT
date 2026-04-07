@@ -7,7 +7,8 @@ export const getSummary = async (req, res, next) => {
     const m = month ? String(month).padStart(2, '0') : String(now.getMonth() + 1).padStart(2, '0');
     const y = year || now.getFullYear();
     const startDate = `${y}-${m}-01`;
-    const endDate   = `${y}-${m}-31`;
+    const lastDay   = new Date(y, Number(m), 0).getDate();
+    const endDate   = `${y}-${m}-${lastDay}`;
 
     const [{ data: monthTx }, { data: allTx }] = await Promise.all([
       supabaseAdmin
@@ -115,7 +116,8 @@ export const getTopCategories = async (req, res, next) => {
     const m = month ? String(month).padStart(2, '0') : String(now.getMonth() + 1).padStart(2, '0');
     const y = year || now.getFullYear();
     const startDate = `${y}-${m}-01`;
-    const endDate   = `${y}-${m}-31`;
+    const lastDay   = new Date(y, Number(m), 0).getDate();
+    const endDate   = `${y}-${m}-${lastDay}`;
 
     const { data, error } = await supabaseAdmin
       .from('transactions')

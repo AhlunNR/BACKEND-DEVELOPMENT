@@ -1,14 +1,18 @@
 import { Router } from 'express';
 import { body, query, param } from 'express-validator';
 import { validate } from '../middleware/validate.js';
+import authenticate from '../middleware/auth.js';
+import resolveProfile from '../middleware/resolveProfile.js';
 import { getBudgets, createBudget, updateBudget, deleteBudget } from '../controllers/budgets.controller.js';
 
 const router = Router();
+router.use(authenticate);
+router.use(resolveProfile);
+
 
 router.get(
   '/',
   validate([
-    query('profile_id').isUUID().withMessage('Invalid profile_id'),
     query('month').isInt({ min: 1, max: 12 }),
     query('year').isInt(),
   ]),
@@ -18,7 +22,6 @@ router.get(
 router.post(
   '/',
   validate([
-    query('profile_id').isUUID().withMessage('Invalid profile_id'),
     body('category_id').isUUID().withMessage('Invalid category_id'),
     body('amount').isNumeric().withMessage('Amount must be positive number'),
     body('month').isInt({ min: 1, max: 12 }),

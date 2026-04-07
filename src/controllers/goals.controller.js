@@ -1,11 +1,8 @@
-import { supabaseAnon as supabase } from '../config/supabase.js';
+import { supabaseAdmin as supabase } from '../config/supabase.js';
 
 export const getGoals = async (req, res) => {
   try {
-    const { profile_id } = req.query;
-    if (!profile_id) {
-      return res.status(400).json({ error: 'BadRequest', message: 'profile_id required' });
-    }
+    const profile_id = req.profile.id;
     const { data: goals, error } = await supabase
       .from('goals')
       .select('*')
@@ -20,12 +17,9 @@ export const getGoals = async (req, res) => {
 
 export const createGoal = async (req, res) => {
   try {
-    const { profile_id } = req.query;
+    const profile_id = req.profile.id;
     const { name, target_amount, current_amount = 0, deadline } = req.body;
     const user_id = req.user.id;
-    if (!profile_id) {
-      return res.status(400).json({ error: 'BadRequest', message: 'profile_id required' });
-    }
     const { data: goal, error } = await supabase
       .from('goals')
       .insert({ profile_id, user_id, name, target_amount, current_amount, deadline })

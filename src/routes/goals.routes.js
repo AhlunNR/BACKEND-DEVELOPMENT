@@ -1,20 +1,20 @@
 import { Router } from 'express';
 import { body, query, param } from 'express-validator';
 import { validate } from '../middleware/validate.js';
+import authenticate from '../middleware/auth.js';
+import resolveProfile from '../middleware/resolveProfile.js';
 import { getGoals, createGoal, updateGoal, deleteGoal } from '../controllers/goals.controller.js';
 
 const router = Router();
+router.use(authenticate);
+router.use(resolveProfile);
 
-router.get(
-  '/',
-  validate([query('profile_id').isUUID().withMessage('Invalid profile_id')]),
-  getGoals
-);
+
+router.get('/', getGoals);
 
 router.post(
   '/',
   validate([
-    query('profile_id').isUUID().withMessage('Invalid profile_id'),
     body('name').notEmpty().withMessage('Name is required'),
     body('target_amount').isNumeric().withMessage('target_amount required'),
     body('current_amount').optional().isNumeric(),

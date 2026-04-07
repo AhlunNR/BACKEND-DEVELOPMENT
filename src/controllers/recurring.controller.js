@@ -1,11 +1,8 @@
-import { supabaseAnon as supabase } from '../config/supabase.js';
+import { supabaseAdmin as supabase } from '../config/supabase.js';
 
 export const getRecurring = async (req, res) => {
   try {
-    const { profile_id } = req.query;
-    if (!profile_id) {
-      return res.status(400).json({ error: 'BadRequest', message: 'profile_id required' });
-    }
+    const profile_id = req.profile.id;
     const { data: recurring, error } = await supabase
       .from('recurring_transactions')
       .select('*')
@@ -20,12 +17,9 @@ export const getRecurring = async (req, res) => {
 
 export const createRecurring = async (req, res) => {
   try {
-    const { profile_id } = req.query;
+    const profile_id = req.profile.id;
     const { category_id, type, amount, description, frequency, next_date } = req.body;
     const user_id = req.user.id;
-    if (!profile_id) {
-      return res.status(400).json({ error: 'BadRequest', message: 'profile_id required' });
-    }
     const { data: rt, error } = await supabase
       .from('recurring_transactions')
       .insert({ profile_id, user_id, category_id, type, amount, description, frequency, next_date, status: 'active' })
