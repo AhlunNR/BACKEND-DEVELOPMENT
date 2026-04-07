@@ -4,19 +4,15 @@ import config from '../config/config.js';
 
 export const inviteMember = async (req, res) => {
   try {
-    const { profile_id } = req.query;
+    const profile_id = req.profile.id;
     const { email, role } = req.body;
     const inviter_id = req.user.id;
     if (!profile_id || !email) {
       return res.status(400).json({ error: 'BadRequest', message: 'profile_id and email are required' });
     }
     const memberRole = ['owner', 'editor', 'viewer'].includes(role) ? role : 'viewer';
-    const { data: profile, error: profileErr } = await supabaseAdmin
-      .from('financial_profiles')
-      .select('name, user_id')
-      .eq('id', profile_id)
-      .single();
-    if (profileErr || !profile || profile.user_id !== inviter_id) {
+    const profile = req.profile;
+    if (profile.user_id !== inviter_id) {
       return res.status(403).json({ error: 'Forbidden', message: 'Not authorized to invite to this profile' });
     }
     const { data: existing } = await supabaseAdmin
@@ -93,7 +89,7 @@ export const acceptInvite = async (req, res) => {
 
 export const getMembers = async (req, res) => {
   try {
-    const { profile_id } = req.query;
+    const profile_id = req.profile.id;
     if (!profile_id) {
       return res.status(400).json({ error: 'BadRequest', message: 'profile_id required' });
     }

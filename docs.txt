@@ -24,35 +24,25 @@ ISOLASI DATA:
   Data setiap profil 100% terpisah. Transaksi di profil "Toko ABC" tidak
   akan muncul di dashboard "Personal", dan sebaliknya.
 
-CARA PAKAI (Aturan profile_id):
-  - Jika TIDAK mengirim profile_id → otomatis pakai profil default (is_default: true)
-  - Jika ingin pakai profil lain  → kirim ?profile_id=<uuid> di query string
-  - profile_id berlaku di: /categories, /transactions, /dashboard/*, /reports/*
-  - /profiles itu sendiri TIDAK memerlukan profile_id
+CARA PAKAI (Arsitektur Middleware Baru):
+  - KasFlow sekarang berjalan menggunakan sistem **Header-Based Resolution**.
+  - Frontend disarankan mengirimkan header: `X-Profile-Type: personal` (atau `business`) di setiap API request.
+  - Middleware `resolveProfile` secara mandiri akan mencari profil aktif yang berhak Anda akses, tanpa perlu Anda kirim `profile_id`.
+  - Jika Anda sedang memanage profil "Toko ABC" (business), kirimkan `X-Profile-Type: business`. Middleware pintar akan mendeteksinya.
+  - Parameter `?profile_id=<uuid>` di query string **TIDAK LAGI WAJIB**, namun jika Anda sertakan, akan diprioritaskan di atas Header (berguna untuk fitur admin/switch spesifik).
 
 FLOW FRONTEND YANG DIREKOMENDASIKAN:
-  1. Saat user login → GET /api/v1/profiles
-     Simpan daftar profil di state aplikasi.
-     Tandai profil aktif = yang is_default: true.
-
-  2. User ingin tambah profil bisnis → tampilkan form → POST /api/v1/profiles
-     { "name": "Toko ABC", "type": "business" }
-     Simpan id dari response sebagai profil baru.
-
-  3. User switch profil (klik dropdown) → update state "activeProfileId"
-     Semua API call berikutnya sertakan ?profile_id=<activeProfileId>
-     atau simpan di header/context dan inject otomatis.
-
-  4. Untuk set profil default baru →
+  1. Frontend menyimpan mode (Personal/UMKM) di localStorage (contoh: `kasflow-mode: umkm`).
+  2. Axios interceptor secara otomatis menambahkan Header `X-Profile-Type: business`.
+  3. Cukup panggil endpoint: `GET /api/v1/goals` tanpa menempelkan ID profil di URL.
+  4. Backend akan otomatis mengisolasi datanya agar tidak tertukar.
+  5. Untuk mengatur profil mana yang jadi default (jika user punya banyak bisnis):
      PATCH /api/v1/profiles/:id/default
 
 KATEGORI OTOMATIS PER TIPE PROFIL:
-  Saat profil "Personal" pertama kali dibuat (login pertama), backend otomatis
-  seed kategori: Gaji, Investasi, Makanan & Minum, Transportasi, Belanja, dll.
-
-  Saat profil "Bisnis" dibuat MANUAL (bukan auto-seed), frontend perlu
-  meminta user mengisi kategori sendiri, atau buat kategori via:
-  POST /api/v1/categories?profile_id=<bisnis-profile-id>
+  Saat profil "Personal" atau "Bisnis" pertama kali dibuat, backend akan men-seed kategori standar.
+  Untuk menambah manual:
+  POST /api/v1/categories
   { "name": "Penjualan", "type": "income" }
 
 CATATAN PENTING:
@@ -458,10 +448,10 @@ CRON JOBS
 =========================================================
 8. PROFILE MEMBERS (Kolaborasi Profil)
 =========================================================
-GET /api/v1/members?profile_id=<uuid>
+GET /api/v1/members
   Melihat daftar member.
 
-POST /api/v1/members/invite?profile_id=<uuid>
+POST /api/v1/members/invite
   Mengundang member via email (Role: owner, editor, viewer).
   Body: { "email": "...", "role": "editor" }
 
@@ -474,10 +464,10 @@ DELETE /api/v1/members/:id
 =========================================================
 9. BUDGETS (Anggaran)
 =========================================================
-GET /api/v1/budgets?profile_id=<uuid>&month=MM&year=YYYY
+GET /api/v1/budgets?month=MM&year=YYYY
   Melihat daftar budget bulan tertentu.
 
-POST /api/v1/budgets?profile_id=<uuid>
+POST /api/v1/budgets
   Membuat aturan budget untuk kategori tertentu.
   Body: { "category_id": "...", "amount": 1000000, "month": 3, "year": 2024 }
 
@@ -490,10 +480,10 @@ DELETE /api/v1/budgets/:id
 =========================================================
 10. GOALS (Tujuan Keuangan)
 =========================================================
-GET /api/v1/goals?profile_id=<uuid>
+GET /api/v1/goals
   List semua goals tabungan.
 
-POST /api/v1/goals?profile_id=<uuid>
+POST /api/v1/goals
   Buat goal menabung.
   Body: { "name": "Beli Motor", "target_amount": 15000000, "deadline": "2024-12-31" }
 
@@ -506,10 +496,10 @@ DELETE /api/v1/goals/:id
 =========================================================
 11. DEBTS (Hutang Piutang)
 =========================================================
-GET /api/v1/debts?profile_id=<uuid>
+GET /api/v1/debts
   List semua catatan hutang/piutang.
 
-POST /api/v1/debts?profile_id=<uuid>
+POST /api/v1/debts
   Buat catatan hutang (payable) atau piutang (receivable).
   Body: { "name": "Pinjaman Bank", "type": "payable", "amount": 50000000, "due_date": "2025-01-01" }
 
@@ -525,10 +515,10 @@ DELETE /api/v1/debts/:id
 =========================================================
 12. RECURRING TRANSACTIONS (Transaksi Berulang)
 =========================================================
-GET /api/v1/recurring?profile_id=<uuid>
+GET /api/v1/recurring
   List jadwal transaksi rutin otomatis.
 
-POST /api/v1/recurring?profile_id=<uuid>
+POST /api/v1/recurring
   Catat langganan / transaksi berulang otomatis.
   Body: { "category_id": "...", "type": "expense", "amount": 50000, "description": "Langganan Spotify", "frequency": "monthly", "next_date": "2024-04-15" }
 
@@ -542,84 +532,84 @@ DELETE /api/v1/recurring/:id
 BUSINESS PROFILE — KEAMANAN ENDPOINT
 =========================================================
 Semua endpoint di bawah (/products, /customers, /pos/*) hanya bisa diakses oleh:
-  - Owner dari profil business tersebut.
-  - Member yang statusnya "accepted" (owner/editor/viewer).
+  - Owner dari profil business secara otomatis via resolusi middleware.
+  - Member (karyawan) yang statusnya "accepted" (owner/editor/viewer).
   - Viewer TIDAK bisa melakukan operasi tulis (POST/PUT/DELETE/PATCH).
   - Profil dengan type "personal" akan diblokir dengan 403 Forbidden.
-Query string ?profile_id=<uuid> WAJIB disertakan di semua endpoint business.
+Gunakan Header `X-Profile-Type: business` untuk koneksi yang aman.
 
 =========================================================
 13. PRODUCTS (Manajemen Produk — Business Only)
 =========================================================
-GET /api/v1/products?profile_id=<uuid>
+GET /api/v1/products
   List semua produk. Tambahan: ?is_active=true, ?low_stock=true
 
-GET /api/v1/products/:id?profile_id=<uuid>
+GET /api/v1/products/:id
   Detail produk.
 
-POST /api/v1/products?profile_id=<uuid>
+POST /api/v1/products
   Buat produk baru. (Editor/Owner only)
   Body: { "name": "Nasi Goreng", "price": 15000, "cost_price": 8000, "stock": 100, "unit": "porsi", "category_id": "..." }
 
-PUT /api/v1/products/:id?profile_id=<uuid>
+PUT /api/v1/products/:id
   Update produk. (Editor/Owner only)
 
-PATCH /api/v1/products/:id/stock?profile_id=<uuid>
+PATCH /api/v1/products/:id/stock
   Adjust stok (+/-). (Editor/Owner only)
   Body: { "adjustment": -5 }
 
-DELETE /api/v1/products/:id?profile_id=<uuid>
+DELETE /api/v1/products/:id
   Hapus produk. (Editor/Owner only)
 
 =========================================================
 14. CUSTOMERS (Pelanggan — Business Only)
 =========================================================
-GET /api/v1/customers?profile_id=<uuid>
+GET /api/v1/customers
   List semua pelanggan.
 
-GET /api/v1/customers/:id?profile_id=<uuid>
+GET /api/v1/customers/:id
   Detail pelanggan.
 
-POST /api/v1/customers?profile_id=<uuid>
+POST /api/v1/customers
   Tambah pelanggan. (Editor/Owner only)
   Body: { "name": "Budi", "phone": "08xxx", "email": "budi@email.com", "address": "Jl. ..." }
 
-PUT /api/v1/customers/:id?profile_id=<uuid>
+PUT /api/v1/customers/:id
   Update pelanggan. (Editor/Owner only)
 
-DELETE /api/v1/customers/:id?profile_id=<uuid>
+DELETE /api/v1/customers/:id
   Hapus pelanggan. (Editor/Owner only)
 
 =========================================================
 15. POS — PAYMENT METHODS
 =========================================================
-GET /api/v1/pos/payment-methods?profile_id=<uuid>
+GET /api/v1/pos/payment-methods
   List metode pembayaran aktif.
 
-POST /api/v1/pos/payment-methods?profile_id=<uuid>
+POST /api/v1/pos/payment-methods
   Tambah metode bayar. (Editor/Owner only)
   Body: { "name": "QRIS" }
 
-DELETE /api/v1/pos/payment-methods/:id?profile_id=<uuid>
+DELETE /api/v1/pos/payment-methods/:id
   Hapus metode bayar. (Editor/Owner only)
 
 =========================================================
 16. POS — VOUCHERS
 =========================================================
-GET /api/v1/pos/vouchers?profile_id=<uuid>
+GET /api/v1/pos/vouchers
   List semua voucher.
 
-POST /api/v1/pos/vouchers?profile_id=<uuid>
+POST /api/v1/pos/vouchers
   Buat voucher diskon. (Editor/Owner only)
   Body: { "code": "HEMAT10", "discount_type": "percent", "discount_value": 10, "min_purchase": 50000, "valid_until": "2024-12-31" }
 
-PUT /api/v1/pos/vouchers/:id?profile_id=<uuid>
+PUT /api/v1/pos/vouchers/:id
   Update voucher.
 
-DELETE /api/v1/pos/vouchers/:id?profile_id=<uuid>
+DELETE /api/v1/pos/vouchers/:id
   Hapus voucher.
 
-POST /api/v1/pos/vouchers/validate?profile_id=<uuid>
+POST /api/v1/pos/vouchers/validate
   Validasi kode voucher sebelum checkout.
   Body: { "code": "HEMAT10", "subtotal": 75000 }
   Response: { data: { voucher: {...}, discount_amount: 7500 } }
@@ -627,13 +617,13 @@ POST /api/v1/pos/vouchers/validate?profile_id=<uuid>
 =========================================================
 17. POS — ORDERS
 =========================================================
-GET /api/v1/pos/orders?profile_id=<uuid>
+GET /api/v1/pos/orders
   List semua order. Tambahan: ?status=paid|pending|cancelled, ?start_date, ?end_date, ?page, ?limit
 
-GET /api/v1/pos/orders/:id?profile_id=<uuid>
+GET /api/v1/pos/orders/:id
   Detail order + items.
 
-POST /api/v1/pos/orders?profile_id=<uuid>
+POST /api/v1/pos/orders
   Buat order baru (otomatis catat ke transactions, kurangi stok). (Editor/Owner only)
   Body:
   {
@@ -647,16 +637,16 @@ POST /api/v1/pos/orders?profile_id=<uuid>
     "note": "..."
   }
 
-POST /api/v1/pos/orders/:id/cancel?profile_id=<uuid>
+POST /api/v1/pos/orders/:id/cancel
   Batalkan order (stok dikembalikan, transaksi dihapus). (Editor/Owner only)
 
-GET /api/v1/pos/orders/:id/receipt?profile_id=<uuid>
+GET /api/v1/pos/orders/:id/receipt
   Download struk PDF dari order.
 
 =========================================================
 18. POS — LAPORAN PENJUALAN
 =========================================================
-GET /api/v1/pos/sales-report?profile_id=<uuid>
+GET /api/v1/pos/sales-report
   Laporan penjualan dengan profit/loss margin.
   Tambahan: ?start_date=YYYY-MM-DD&end_date=YYYY-MM-DD
   Response: { data: [...orders], summary: { total_orders, total_revenue, total_cost, gross_profit } }
