@@ -339,12 +339,13 @@ GET /api/v1/dashboard/summary
 GET /api/v1/dashboard/chart
   Query Params (Opsional):
     - profile_id: uuid
-    - months: 1-12 (default: 6, data N bulan terakhir)
+    - weeks: 1-24 (default: 12, data N minggu terakhir berdasarkan hari Senin)
+  Catatan: Data dikelompokkan per minggu (Senin–Minggu). Waktu dihitung berdasarkan WIB (UTC+7).
   Response 200:
   {
     "data": [
-      { "month": "2024-01", "income": 5000000, "expense": 2000000, "profit_loss": 3000000 },
-      { "month": "2024-02", "income": 4500000, "expense": 3000000, "profit_loss": 1500000 }
+      { "period": "20 Jan", "income": 5000000, "expense": 2000000, "profit_loss": 3000000 },
+      { "period": "27 Jan", "income": 4500000, "expense": 3000000, "profit_loss": 1500000 }
     ]
   }
 

@@ -43,12 +43,42 @@ export const getSummary = async (req, res, next) => {
   }
 };
 
+const WIB_OFFSET = 7;
+
+function nowWIB() {
+  const utc = new Date();
+  return new Date(utc.getTime() + WIB_OFFSET * 60 * 60 * 1000);
+}
+
+function toDateStr(d) {
+  const y = d.getUTCFullYear();
+  const m = String(d.getUTCMonth() + 1).padStart(2, '0');
+  const dd = String(d.getUTCDate()).padStart(2, '0');
+  return `${y}-${m}-${dd}`;
+}
+
+
+function getMondayOf(dateStr) {
+  const [y, m, dd] = dateStr.split('-').map(Number);
+  const d = new Date(Date.UTC(y, m - 1, dd));
+  const dow = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() - dow + 1);
+  return d;
+}
+
+const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun',
+                      'Jul', 'Ags', 'Sep', 'Okt', 'Nov', 'Des'];
+
 export const getChart = async (req, res, next) => {
   try {
-    const months = Math.min(Number(req.query.months) || 6, 12);
-    const since  = new Date();
-    since.setMonth(since.getMonth() - (months - 1));
-    const sinceStr = `${since.getFullYear()}-${String(since.getMonth() + 1).padStart(2, '0')}-01`;
+    const weeks = Math.min(Number(req.query.weeks) || 12, 24);
+
+    const todayWIB   = nowWIB();
+    const todayStr   = toDateStr(todayWIB);
+    const curMonday  = getMondayOf(todayStr);
+    const startMonday = new Date(curMonday);
+    startMonday.setUTCDate(startMonday.getUTCDate() - ((weeks - 1) * 7));
+    const sinceStr = toDateStr(startMonday);
 
     const { data, error } = await supabaseAdmin
       .from('transactions')
@@ -60,17 +90,30 @@ export const getChart = async (req, res, next) => {
     if (error) throw error;
 
     const grouped = {};
+    for (let w = 0; w < weeks; w++) {
+      const wk = new Date(startMonday);
+      wk.setUTCDate(wk.getUTCDate() + (w * 7));
+
+      const key    = toDateStr(wk);
+      const dayStr = String(wk.getUTCDate()).padStart(2, '0');
+      const monStr = MONTH_LABELS[wk.getUTCMonth()];
+
+      grouped[key] = { income: 0, expense: 0, period: `${dayStr} ${monStr}` };
+    }
+
     for (const row of data || []) {
-      const key = row.date.substring(0, 7);
-      if (!grouped[key]) grouped[key] = { income: 0, expense: 0 };
-      if (row.type === 'income')  grouped[key].income  += Number(row.amount);
-      if (row.type === 'expense') grouped[key].expense += Number(row.amount);
+      if (!row.date) continue;
+      const key = toDateStr(getMondayOf(row.date));
+      if (grouped[key]) {
+        if (row.type === 'income')  grouped[key].income  += Number(row.amount);
+        if (row.type === 'expense') grouped[key].expense += Number(row.amount);
+      }
     }
 
     const result = Object.entries(grouped)
       .sort(([a], [b]) => a.localeCompare(b))
-      .map(([month, v]) => ({
-        month,
+      .map(([, v]) => ({
+        period:      v.period,
         income:      v.income,
         expense:     v.expense,
         profit_loss: v.income - v.expense,
