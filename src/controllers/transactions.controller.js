@@ -2,6 +2,13 @@ import { supabaseAdmin } from '../config/supabase.js';
 import { AppError } from '../middleware/errorHandler.js';
 import { extractReceiptData } from '../utils/ocr.js';
 import { uploadToCatbox } from '../utils/catbox.js';
+import {
+  addXp,
+  updateStreak,
+  checkAndUnlockBadges,
+  completeMission,
+  XP_REWARDS,
+} from '../services/gamification.service.js';
 
 export const getTransactions = async (req, res, next) => {
   try {
@@ -98,6 +105,37 @@ export const createTransaction = async (req, res, next) => {
       .single();
 
     if (error) throw error;
+
+    // ── GAMIFIKASI ──────────────────────────────────────────
+    // Pakai try-catch tersendiri supaya kalau gamifikasi error,
+    // transaksi user tetap berhasil disimpan
+    try {
+      const userId = req.user.id;
+
+      // 1. Tambah XP
+      await addXp(userId, XP_REWARDS.transaction_created, 'transaction_created');
+
+      // 2. Update streak harian
+      await updateStreak(userId);
+
+      // 3. Cek badge berdasarkan total transaksi user
+      const { count } = await supabaseAdmin
+        .from('transactions')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', userId);
+      await checkAndUnlockBadges(userId, { transactionCount: count ?? 0 });
+
+      // 4. Complete misi harian
+      if (data.type === 'expense') {
+        await completeMission(userId, 'record_expense');
+      } else {
+        await completeMission(userId, 'record_income');
+      }
+    } catch (gamErr) {
+      console.error('[Gamification] Error saat createTransaction:', gamErr.message);
+    }
+    // ── END GAMIFIKASI ──────────────────────────────────────
+
     return res.status(201).json({ data, message: 'Transaction created' });
   } catch (err) {
     next(err);

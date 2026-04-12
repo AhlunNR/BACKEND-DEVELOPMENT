@@ -22,6 +22,7 @@ import recurringRoutes from './routes/recurring.routes.js';
 import productsRoutes from './routes/products.routes.js';
 import customersRoutes from './routes/customers.routes.js';
 import posRoutes from './routes/pos.routes.js';
+import gamificationRoutes from './routes/gamification.routes.js'; // ← BARU
 import errorHandler from './middleware/errorHandler.js';
 import { startDailyReminderCron, runDailyReminder } from './jobs/dailyReminder.js';
 import { startRecurringCron, processRecurringTransactions } from './jobs/recurringJobs.js';
@@ -84,6 +85,7 @@ app.get('/api/v1', (_req, res) => {
       pos:          '/api/v1/pos',
       dashboard:    '/api/v1/dashboard',
       reports:      '/api/v1/reports',
+      gamification: '/api/v1/gamification', // ← BARU
     },
   });
 });
@@ -104,6 +106,7 @@ app.use('/api/v1/pos',           posRoutes);
 app.use('/api/v1/dashboard',     dashboardRoutes);
 app.use('/api/v1/reports',       reportsRoutes);
 app.use('/api/v1/notifications', notificationsRoutes);
+app.use('/api/v1/gamification',  gamificationRoutes); // ← BARU
 
 app.use('/api/v1/admin', adminRoutes);
 
