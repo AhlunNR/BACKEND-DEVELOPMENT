@@ -411,3 +411,151 @@ CREATE TABLE IF NOT EXISTS notifications (
 );
 
 CREATE INDEX IF NOT EXISTS idx_notifications_created_at ON notifications(created_at DESC);
+
+-- ============================================================
+-- GAMIFIKASI
+-- ============================================================
+
+-- 1. User Gamification (level, xp, streak per user)
+CREATE TABLE IF NOT EXISTS user_gamification (
+  id                  UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id             UUID        NOT NULL REFERENCES users(id) ON DELETE CASCADE UNIQUE,
+  xp                  INTEGER     NOT NULL DEFAULT 0,
+  level               INTEGER     NOT NULL DEFAULT 1,
+  streak_days         INTEGER     NOT NULL DEFAULT 0,
+  last_activity_date  DATE,
+  created_at          TIMESTAMPTZ DEFAULT NOW(),
+  updated_at          TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 2. Badge definitions
+CREATE TABLE IF NOT EXISTS badges (
+  id          UUID    PRIMARY KEY DEFAULT gen_random_uuid(),
+  key         TEXT    NOT NULL UNIQUE,
+  name        TEXT    NOT NULL,
+  description TEXT,
+  icon        TEXT,
+  color       TEXT,
+  type        TEXT    NOT NULL CHECK (type IN ('transaction', 'level', 'streak', 'financial_health')),
+  threshold   INTEGER NOT NULL DEFAULT 0,
+  created_at  TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 3. User Badges (many-to-many: user ↔ badge)
+CREATE TABLE IF NOT EXISTS user_badges (
+  id          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id     UUID        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  badge_id    UUID        NOT NULL REFERENCES badges(id) ON DELETE CASCADE,
+  unlocked_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE (user_id, badge_id)
+);
+
+-- 4. Daily Mission definitions
+CREATE TABLE IF NOT EXISTS daily_missions (
+  id          UUID    PRIMARY KEY DEFAULT gen_random_uuid(),
+  key         TEXT    NOT NULL UNIQUE,
+  title       TEXT    NOT NULL,
+  description TEXT,
+  xp_reward   INTEGER NOT NULL DEFAULT 10,
+  type        TEXT    NOT NULL DEFAULT 'daily',
+  created_at  TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 5. User Daily Missions (tracking per user per day)
+CREATE TABLE IF NOT EXISTS user_daily_missions (
+  id           UUID    PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id      UUID    NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  mission_id   UUID    NOT NULL REFERENCES daily_missions(id) ON DELETE CASCADE,
+  date         DATE    NOT NULL DEFAULT CURRENT_DATE,
+  completed    BOOLEAN NOT NULL DEFAULT FALSE,
+  completed_at TIMESTAMPTZ,
+  UNIQUE (user_id, mission_id, date)
+);
+
+-- 6. XP History (log setiap penambahan XP)
+CREATE TABLE IF NOT EXISTS xp_history (
+  id         UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id    UUID        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  amount     INTEGER     NOT NULL,
+  reason     TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Triggers
+DROP TRIGGER IF EXISTS set_updated_at_user_gamification ON user_gamification;
+CREATE TRIGGER set_updated_at_user_gamification
+  BEFORE UPDATE ON user_gamification
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+-- RLS
+ALTER TABLE user_gamification   ENABLE ROW LEVEL SECURITY;
+ALTER TABLE badges              ENABLE ROW LEVEL SECURITY;
+ALTER TABLE user_badges         ENABLE ROW LEVEL SECURITY;
+ALTER TABLE daily_missions      ENABLE ROW LEVEL SECURITY;
+ALTER TABLE user_daily_missions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE xp_history          ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "user_gamification: own row"     ON user_gamification;
+DROP POLICY IF EXISTS "badges: read all"               ON badges;
+DROP POLICY IF EXISTS "user_badges: own rows"          ON user_badges;
+DROP POLICY IF EXISTS "daily_missions: read all"       ON daily_missions;
+DROP POLICY IF EXISTS "user_daily_missions: own rows"  ON user_daily_missions;
+DROP POLICY IF EXISTS "xp_history: own rows"           ON xp_history;
+
+CREATE POLICY "user_gamification: own row" ON user_gamification
+  FOR ALL USING (auth.uid() = user_id);
+
+CREATE POLICY "badges: read all" ON badges
+  FOR SELECT USING (true);
+
+CREATE POLICY "user_badges: own rows" ON user_badges
+  FOR ALL USING (auth.uid() = user_id);
+
+CREATE POLICY "daily_missions: read all" ON daily_missions
+  FOR SELECT USING (true);
+
+CREATE POLICY "user_daily_missions: own rows" ON user_daily_missions
+  FOR ALL USING (auth.uid() = user_id);
+
+CREATE POLICY "xp_history: own rows" ON xp_history
+  FOR ALL USING (auth.uid() = user_id);
+
+-- Indexes
+CREATE INDEX IF NOT EXISTS idx_user_gamification_user_id ON user_gamification(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_badges_user_id       ON user_badges(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_badges_badge_id      ON user_badges(badge_id);
+CREATE INDEX IF NOT EXISTS idx_user_daily_missions_user   ON user_daily_missions(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_daily_missions_date   ON user_daily_missions(date);
+CREATE INDEX IF NOT EXISTS idx_xp_history_user_id        ON xp_history(user_id);
+
+-- ============================================================
+-- SEED DATA: Badges
+-- ============================================================
+INSERT INTO badges (key, name, description, icon, color, type, threshold) VALUES
+  -- Transaction badges
+  ('tx_starter',    'Starter',       'Capai 50 transaksi',         'check-circle', '#3b82f6', 'transaction', 50),
+  ('tx_active',     'Active User',   'Capai 100 transaksi',        'check-circle', '#3b82f6', 'transaction', 100),
+  ('tx_loyal',      'Loyal User',    'Capai 150 transaksi',        'check-circle', '#3b82f6', 'transaction', 150),
+  ('tx_super',      'Super User',    'Capai 200 transaksi',        'check-circle', '#3b82f6', 'transaction', 200),
+  -- Financial health badges
+  ('health_good',   'Sehat Finansial',    'Raih skor finansial 80',        'heart-pulse', '#10b981', 'financial_health', 80),
+  ('health_steady', 'Konsisten Sehat',    'Pertahankan skor 80+ selama 7 hari', 'heart-pulse', '#10b981', 'financial_health', 80),
+  -- Level badges
+  ('level_2',       'Paham Finansial',    'Capai Level Finansial 2',  'trophy', '#f59e0b', 'level', 2),
+  ('level_3',       'Bisa Finansial',     'Capai Level Finansial 3',  'trophy', '#f59e0b', 'level', 3),
+  ('level_4',       'Cakap Finansial',    'Capai Level Finansial 4',  'trophy', '#f59e0b', 'level', 4),
+  ('level_5',       'Ahli Finansial',     'Capai Level Finansial 5',  'trophy', '#f59e0b', 'level', 5),
+  -- Streak badges
+  ('streak_3',      'Konsisten 3 Hari',   'Login streak 3 hari berturut-turut', 'flame', '#f97316', 'streak', 3),
+  ('streak_7',      'Konsisten 7 Hari',   'Login streak 7 hari berturut-turut', 'flame', '#f97316', 'streak', 7),
+  ('streak_14',     'Konsisten 14 Hari',  'Login streak 14 hari berturut-turut', 'flame', '#f97316', 'streak', 14)
+ON CONFLICT (key) DO NOTHING;
+
+-- ============================================================
+-- SEED DATA: Daily Missions
+-- ============================================================
+INSERT INTO daily_missions (key, title, description, xp_reward, type) VALUES
+  ('record_expense', 'Catat Pengeluaran',     'Catat minimal 1 pengeluaran hari ini',   20,  'daily'),
+  ('record_income',  'Catat Pemasukan',        'Catat minimal 1 pemasukan hari ini',     20,  'daily'),
+  ('review_budget',  'Review Anggaran',        'Buka halaman anggaran dan review',       15,  'daily')
+ON CONFLICT (key) DO NOTHING;

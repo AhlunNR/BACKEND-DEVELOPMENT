@@ -186,9 +186,7 @@ export async function checkAndUnlockBadges(userId, context = {}) {
   if (toUnlock.length > 0) {
     await supabaseAdmin
       .from('user_badges')
-      .insert(toUnlock)
-      .onConflict(['user_id', 'badge_id'])
-      .ignore();
+      .upsert(toUnlock, { onConflict: 'user_id, badge_id', ignoreDuplicates: true });
   }
 
   return toUnlock.length;
@@ -339,8 +337,6 @@ export async function ensureTodayMissions(userId) {
   if (toInsert.length > 0) {
     await supabaseAdmin
       .from('user_daily_missions')
-      .insert(toInsert)
-      .onConflict(['user_id', 'mission_id', 'date'])
-      .ignore();
+      .upsert(toInsert, { onConflict: 'user_id, mission_id, date', ignoreDuplicates: true });
   }
 }
